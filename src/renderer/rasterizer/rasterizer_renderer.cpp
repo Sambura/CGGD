@@ -28,8 +28,6 @@ void cg::renderer::rasterization_renderer::init()
 
 void cg::renderer::rasterization_renderer::render()
 {
-	// TODO Lab: 1.05 Implement `pixel_shader` lambda for the instance of `cg::renderer::rasterizer`
-
 	float4x4 matrix = mul(
 		camera->get_projection_matrix(), 
 		camera->get_view_matrix(),
@@ -39,9 +37,12 @@ void cg::renderer::rasterization_renderer::render()
 		float4 processed = mul(matrix, vertex);
 		return std::make_pair(processed, data);
 	};
+	rasterizer->pixel_shader = [](cg::vertex data, float z) {
+		return data.ambient;
+	};
 
 	auto start_time = std::chrono::high_resolution_clock::now();
-	rasterizer->clear_render_target({255, 0, 0});
+	rasterizer->clear_render_target({15, 15, 15});
 	auto end_time = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<float, std::milli> clear_time = end_time - start_time;
 	std::cout << "Clear time: " << clear_time.count() << " ms.\n";

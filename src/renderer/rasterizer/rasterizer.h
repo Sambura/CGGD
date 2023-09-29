@@ -94,7 +94,6 @@ namespace cg::renderer
 	template<typename VB, typename RT>
 	inline void rasterizer<VB, RT>::draw(size_t num_vertexes, size_t vertex_offset)
 	{
-		// TODO Lab: 1.05 Add `Rasterization` and `Pixel shader` stages to `draw` method of `cg::renderer::rasterizer`
 		// TODO Lab: 1.06 Add `Depth test` stage to `draw` method of `cg::renderer::rasterizer`
 
 		size_t vertex_id = vertex_offset;
@@ -116,6 +115,40 @@ namespace cg::renderer
 				vertex.pos.x = (vertex.pos.x + 1) * width / 2;
 				vertex.pos.y = (-vertex.pos.y + 1) * height / 2;
 			}
+
+			float2 vertex_a = float2 { vertices[0].pos.x, vertices[0].pos.y };
+			float2 vertex_b = float2 { vertices[1].pos.x, vertices[1].pos.y };
+			float2 vertex_c = float2 { vertices[2].pos.x, vertices[2].pos.y };
+
+			float2 min_vertex = min(vertex_a, min(vertex_b, vertex_c));
+			float2 bounding_box_begin = round(clamp(
+					min_vertex, 
+					float2{0, 0}, 
+					float2{static_cast<float>(width - 1), static_cast<float>(height - 1)}
+			));
+
+			float2 max_vertex = max(vertex_a, max(vertex_b, vertex_c));
+			float2 bounding_box_end = round(clamp(
+					max_vertex, 
+					float2{0, 0}, 
+					float2{static_cast<float>(width - 1), static_cast<float>(height - 1)}
+			));
+
+			for (float x = bounding_box_begin.x; x <= bounding_box_end.x; x++) {
+				for (float y = bounding_box_begin.y; y <= bounding_box_end.y; y++) {
+					float2 point {x, y};
+					float edge1 = edge_function(vertex_a, vertex_b, point);
+					float edge2 = edge_function(vertex_b, vertex_c, point);
+					float edge3 = edge_function(vertex_c, vertex_a, point);
+
+					if (edge1 >= 0 && edge2 >= 0 && edge3 >= 0) {
+						size_t u_x = static_cast<size_t>(x);
+						size_t u_y = static_cast<size_t>(y);
+						cg::fcolor pixel_result = pixel_shader(vertices[0], 0);
+						render_target->item(u_x, u_y) = cg::from_fcolor(pixel_result);
+					}
+				}
+			}
 		}
 	}
 
@@ -123,8 +156,7 @@ namespace cg::renderer
 	inline float
 	rasterizer<VB, RT>::edge_function(float2 a, float2 b, float2 c)
 	{
-		// TODO Lab: 1.05 Implement `cg::renderer::rasterizer::edge_function` method
-		return 0.f;
+		return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 	}
 
 	template<typename VB, typename RT>
@@ -138,4 +170,4 @@ namespace cg::renderer
 		return depth_buffer->item(x, y) > z;
 	}
 
-}// namespace cg::renderer
+} // namespace cg::renderer

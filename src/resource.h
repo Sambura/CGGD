@@ -107,6 +107,8 @@ namespace cg
 	using ucolor = byte3;
 	using fcolor = float3;
 
+	inline ucolor from_fcolor(fcolor color) { return static_cast<ucolor>(clamp(color * 255, 0, 255)); };
+
 	struct vertex
 	{
 		float3 pos;
