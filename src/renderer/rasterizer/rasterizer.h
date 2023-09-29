@@ -35,7 +35,7 @@ namespace cg::renderer
 		void draw(size_t num_vertexes, size_t vertex_offset);
 
 		std::function<std::pair<float4, VB>(float4 vertex, VB vertex_data)> vertex_shader;
-		std::function<cg::color(const VB& vertex_data, const float z)> pixel_shader;
+		std::function<cg::fcolor(const VB& vertex_data, const float z)> pixel_shader;
 
 	protected:
 		std::shared_ptr<cg::resource<VB>> vertex_buffer;

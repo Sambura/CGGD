@@ -26,7 +26,7 @@ namespace cg::renderer
 	{
 		float t;
 		float3 bary;
-		cg::color color;
+		cg::fcolor color;
 	};
 
 	template<typename VB>

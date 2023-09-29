@@ -46,10 +46,10 @@ namespace cg
 	inline const T* resource<T>::get_data() { return data.data(); }
 
 	template<typename T>
-	inline T& resource<T>::item(size_t item) { return data[item]; }
+	inline T& resource<T>::item(size_t item) { return data.at(item); /* data[item]; */ }
 
 	template<typename T>
-	inline T& resource<T>::item(size_t x, size_t y) { return data[x + stride * y]; }
+	inline T& resource<T>::item(size_t x, size_t y) { return data.at(x + stride * y); /* data[x + stride * y]; */ }
 
 	template<typename T>
 	inline size_t resource<T>::get_size_in_bytes() const { return item_size * data.size(); }
@@ -104,13 +104,17 @@ namespace cg
 		uint8_t b;
 	};
 
-
-	struct vertex
-	{
-		// TODO Lab: 1.03 Implement `cg::vertex` struct
-	};
-
 	using ucolor = byte3;
 	using fcolor = float3;
 
-}// namespace cg
+	struct vertex
+	{
+		float3 pos;
+		float3 norm;
+		float2 uv;
+		fcolor ambient;
+		fcolor diffuse;
+		fcolor emissive;
+	};
+
+} // namespace cg
