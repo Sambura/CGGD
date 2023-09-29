@@ -94,9 +94,29 @@ namespace cg::renderer
 	template<typename VB, typename RT>
 	inline void rasterizer<VB, RT>::draw(size_t num_vertexes, size_t vertex_offset)
 	{
-		// TODO Lab: 1.04 Implement `cg::world::camera` class
 		// TODO Lab: 1.05 Add `Rasterization` and `Pixel shader` stages to `draw` method of `cg::renderer::rasterizer`
 		// TODO Lab: 1.06 Add `Depth test` stage to `draw` method of `cg::renderer::rasterizer`
+
+		size_t vertex_id = vertex_offset;
+		while (vertex_id < vertex_offset + num_vertexes) {
+			std::vector<VB> vertices {
+				vertex_buffer->item(index_buffer->item(vertex_id++)),
+				vertex_buffer->item(index_buffer->item(vertex_id++)),
+				vertex_buffer->item(index_buffer->item(vertex_id++))
+			};
+
+			for (auto& vertex : vertices) {
+				float4 coords { vertex.pos.x, vertex.pos.y, vertex.pos.z, 1 };
+				auto processed_vertex = vertex_shader(coords, vertex);
+
+				vertex.pos.x = processed_vertex.first.x / processed_vertex.first.w;
+				vertex.pos.y = processed_vertex.first.y / processed_vertex.first.w;
+				vertex.pos.z = processed_vertex.first.z / processed_vertex.first.w;
+
+				vertex.pos.x = (vertex.pos.x + 1) * width / 2;
+				vertex.pos.y = (-vertex.pos.y + 1) * height / 2;
+			}
+		}
 	}
 
 	template<typename VB, typename RT>
