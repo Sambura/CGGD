@@ -17,7 +17,7 @@ namespace cg
 	public:
 		resource(size_t size);
 		resource(size_t x_size, size_t y_size);
-		~resource();
+		virtual ~resource();
 
 		const T* get_data();
 		T& item(size_t item);
@@ -29,74 +29,42 @@ namespace cg
 
 	private:
 		std::vector<T> data;
-		size_t item_size = sizeof(T);
-		size_t stride;
+		const size_t item_size = sizeof(T);
+		const size_t stride;
 	};
 
 	template<typename T>
-	inline resource<T>::resource(size_t size)
-	{
-		// TODO Lab: 1.02 Implement `cg::resource` class
-	}
+	inline resource<T>::resource(size_t size) : data(size), stride(0) {}
+	
 	template<typename T>
-	inline resource<T>::resource(size_t x_size, size_t y_size)
-	{
-		// TODO Lab: 1.02 Implement `cg::resource` class
-	}
+	inline resource<T>::resource(size_t x_size, size_t y_size) : data(x_size * y_size), stride(x_size) {}
+	
 	template<typename T>
-	inline resource<T>::~resource()
-	{
-	}
-	template<typename T>
-	inline const T* resource<T>::get_data()
-	{
-		// TODO Lab: 1.02 Implement `cg::resource` class
-		return nullptr;
-	}
-	template<typename T>
-	inline T& resource<T>::item(size_t item)
-	{
-		// TODO Lab: 1.02 Implement `cg::resource` class
-		return T();
-	}
-	template<typename T>
-	inline T& resource<T>::item(size_t x, size_t y)
-	{
-		// TODO Lab: 1.02 Implement `cg::resource` class
-		return T();
-	}
-	template<typename T>
-	inline size_t resource<T>::get_size_in_bytes() const
-	{
-		// TODO Lab: 1.02 Implement `cg::resource` class
-		return 0;
-	}
-	template<typename T>
-	inline size_t resource<T>::get_number_of_elements() const
-	{
-		// TODO Lab: 1.02 Implement `cg::resource` class
-		return 0;
-	}
+	inline resource<T>::~resource() {}
 
 	template<typename T>
-	inline size_t resource<T>::get_stride() const
-	{
-		// TODO Lab: 1.02 Implement `cg::resource` class
-		return 0;
-	}
+	inline const T* resource<T>::get_data() { return data.data(); }
+
+	template<typename T>
+	inline T& resource<T>::item(size_t item) { return data[item]; }
+
+	template<typename T>
+	inline T& resource<T>::item(size_t x, size_t y) { return data[x + stride * y]; }
+
+	template<typename T>
+	inline size_t resource<T>::get_size_in_bytes() const { return item_size * data.size(); }
+
+	template<typename T>
+	inline size_t resource<T>::get_number_of_elements() const { return data.size(); }
+
+	template<typename T>
+	inline size_t resource<T>::get_stride() const { return stride; }
 
 	struct color
 	{
-		static color from_float3(const float3& in)
-		{
-			// TODO Lab: 1.02 Implement `cg::color` and `cg::unsigned_color` structs
-			return color{};
-		};
-		float3 to_float3() const
-		{
-			// TODO Lab: 1.02 Implement `cg::color` and `cg::unsigned_color` structs
-			return float3{};
-		}
+		static color from_float3(const float3& in) { return color{ in.x, in.y, in.z }; }
+		float3 to_float3() const { return float3{r, g, b}; }
+
 		float r;
 		float g;
 		float b;
@@ -106,19 +74,31 @@ namespace cg
 	{
 		static unsigned_color from_color(const color& color)
 		{
-			// TODO Lab: 1.02 Implement `cg::color` and `cg::unsigned_color` structs
-			return unsigned_color{};
+			return unsigned_color{
+				static_cast<uint8_t>(std::clamp(color.r, 0.f, 1.f) * 255), 
+				static_cast<uint8_t>(std::clamp(color.g, 0.f, 1.f) * 255), 
+				static_cast<uint8_t>(std::clamp(color.b, 0.f, 1.f) * 255)
+			};
 		};
-		static unsigned_color from_float3(const float3& color)
-		{
-			// TODO Lab: 1.02 Implement `cg::color` and `cg::unsigned_color` structs
-			return unsigned_color{};
+
+		static unsigned_color from_float3(const float3& color) {
+			float3 clamped = clamp(color, 0, 1) * 255;
+
+			return unsigned_color{ 
+				static_cast<uint8_t>(clamped.x), 
+				static_cast<uint8_t>(clamped.y),
+				static_cast<uint8_t>(clamped.z),
+			};
+		}
+
+		float3 to_float3() const { 
+			return float3{ 
+				static_cast<float>(r), 
+				static_cast<float>(g), 
+				static_cast<float>(b), 
+			} / 255.f; 
 		};
-		float3 to_float3() const
-		{
-			// TODO Lab: 1.02 Implement `cg::color` and `cg::unsigned_color` structs
-			return float3{};
-		};
+
 		uint8_t r;
 		uint8_t g;
 		uint8_t b;
@@ -129,5 +109,8 @@ namespace cg
 	{
 		// TODO Lab: 1.03 Implement `cg::vertex` struct
 	};
+
+	using ucolor = byte3;
+	using fcolor = float3;
 
 }// namespace cg
