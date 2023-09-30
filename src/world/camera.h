@@ -20,7 +20,7 @@ namespace cg::world
 		void set_theta(float in_theta);
 		void set_phi(float in_phi);
 
-		void set_angle_of_view(float in_aov);
+		void set_field_of_view(float in_aov);
 		void set_height(float in_height);
 		void set_width(float in_width);
 		void set_z_near(float in_z_near);
@@ -35,11 +35,17 @@ namespace cg::world
 		const DirectX::XMMATRIX get_dxm_mvp_matrix() const;
 #endif
 		const float3 get_position() const;
-		const float3 get_direction() const;
+		const float3 get_forward() const;
 		const float3 get_right() const;
 		const float3 get_up() const;
 		const float get_theta() const;
 		const float get_phi() const;
+		const float get_z_near() const;
+		const float get_z_far() const;
+		const float get_aspect_ratio() const;
+		const float get_fov() const;
+		const float get_width() const;
+		const float get_height() const;
 
 	protected:
 		float3 position;
@@ -49,8 +55,8 @@ namespace cg::world
 		float height;
 		float width;
 		float aspect_ratio;
-		float angle_of_view;
+		float field_of_view;
 		float z_near;
 		float z_far;
 	};
-}// namespace cg::world
+} // namespace cg::world

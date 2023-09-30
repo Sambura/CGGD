@@ -2,11 +2,20 @@
 
 #include "utils/resource_utils.h"
 
+std::chrono::steady_clock::time_point __pet_start_time;
+
+#define PRINT_EXECUTION_TIME(name, stmts) \
+	__pet_start_time = std::chrono::high_resolution_clock::now(); \
+	stmts \
+	std::cout << name << ": " << \
+		(static_cast<std::chrono::duration<float, std::milli>>( \
+			std::chrono::high_resolution_clock::now() - __pet_start_time) \
+		).count() << " ms.\n";
 
 void cg::renderer::rasterization_renderer::init()
 {
 	// TODO Lab: 1.06 Add depth buffer in `cg::renderer::rasterization_renderer`
-
+	
 	rasterizer = std::make_shared<cg::renderer::rasterizer<cg::vertex, cg::ucolor>>();
 	rasterizer->set_viewport(settings->width, settings->height);
 	render_target = std::make_shared<cg::resource<cg::ucolor>>(settings->width, settings->height);
@@ -21,7 +30,7 @@ void cg::renderer::rasterization_renderer::init()
 	camera->set_position(float3{settings->camera_position[0], settings->camera_position[1], settings->camera_position[2]});
 	camera->set_theta(settings->camera_theta);
 	camera->set_phi(settings->camera_phi);
-	camera->set_angle_of_view(settings->camera_angle_of_view);
+	camera->set_field_of_view(settings->camera_angle_of_view);
 	camera->set_z_near(settings->camera_z_near);
 	camera->set_z_far(settings->camera_z_far);
 }
@@ -41,25 +50,22 @@ void cg::renderer::rasterization_renderer::render()
 		return data.ambient;
 	};
 
-	auto start_time = std::chrono::high_resolution_clock::now();
-	rasterizer->clear_render_target({15, 15, 15});
-	auto end_time = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<float, std::milli> clear_time = end_time - start_time;
-	std::cout << "Clear time: " << clear_time.count() << " ms.\n";
+	PRINT_EXECUTION_TIME("Clear time", 
+		rasterizer->clear_render_target({15, 15, 15});
+	);
 
-	start_time = std::chrono::high_resolution_clock::now();
-	for (size_t shape_id = 0; shape_id < model->get_index_buffers().size(); shape_id++) {
-		rasterizer->set_vertex_buffer(model->get_vertex_buffers()[shape_id]);
-		rasterizer->set_index_buffer(model->get_index_buffers()[shape_id]);
-		rasterizer->draw(
-			model->get_index_buffers()[shape_id]->get_number_of_elements(),
-			0
-		);
-	}
-	end_time = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<float, std::milli> draw_time = end_time - start_time;
-	std::cout << "Draw time: " << draw_time.count() << " ms.\n";
+	PRINT_EXECUTION_TIME("Draw time",
+		auto& vertices = model->get_vertex_buffers();
+		auto& indices = model->get_index_buffers();
 
+		for (size_t mesh_idx = 0; mesh_idx < indices.size(); mesh_idx++) {
+			rasterizer->set_vertex_buffer(vertices[mesh_idx]);
+			rasterizer->set_index_buffer(indices[mesh_idx]);
+			rasterizer->draw(indices[mesh_idx]->get_number_of_elements(), 0);
+		}
+	);
+
+	// save render target as an image at `settings->result_path`
 	cg::utils::save_resource(*render_target, settings->result_path);
 }
 

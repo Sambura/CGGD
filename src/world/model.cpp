@@ -22,23 +22,21 @@ void cg::world::model::load_obj(const std::filesystem::path& model_path)
 
 	tinyobj::ObjReader reader;
 	if (!reader.ParseFromFile(model_path.string(), readerConfig)) {
-		if (!reader.Error().empty()) {
-			THROW_ERROR(reader.Error());
-		}
+		if (!reader.Error().empty()) THROW_ERROR(reader.Error());
 	}
 
-	auto& shapes = reader.GetShapes();
-	auto& attributes = reader.GetAttrib();
-	auto& materials = reader.GetMaterials();
-
-	allocate_buffers(shapes);
-	fill_buffers(shapes, attributes, materials, model_path.parent_path());
+	allocate_buffers(reader.GetShapes());
+	fill_buffers(
+		reader.GetShapes(), 
+		reader.GetAttrib(), 
+		reader.GetMaterials(), 
+		model_path.parent_path()
+	);
 }
 
 void model::allocate_buffers(const std::vector<tinyobj::shape_t>& shapes)
 {
 	for (const auto& shape : shapes) {
-		size_t index_offset = 0;
 		unsigned int vertex_buffer_size = 0;
 		unsigned int idx_size = 0;
 		std::map<std::tuple<int, int, int>, unsigned int> index_map;
@@ -112,36 +110,26 @@ void model::fill_buffers(const std::vector<tinyobj::shape_t>& shapes, const tiny
 		const std::vector<tinyobj::material_t>& materials, const std::filesystem::path& base_folder)
 {
 	for (size_t s = 0; s < shapes.size(); s++) {
-		size_t index_offset = 0;
+		size_t index = 0;
 		unsigned int vertex_buffer_id = 0;
 		unsigned int index_buffer_id = 0;
-		auto vertex_buffer = vertex_buffers[s];
-		auto index_buffer = index_buffers[s];
 		std::map<std::tuple<int, int, int>, unsigned int> index_map;
 		const auto& mesh = shapes[s].mesh;
 
 		for (size_t f = 0; f < mesh.num_face_vertices.size(); f++) {
-			unsigned int fv = mesh.num_face_vertices[f];
-			float3 normal;
-
-			if (mesh.indices[index_offset].normal_index < 0) {
-				normal = compute_normal(attrib, mesh, index_offset);
-			}
+			float3 normal = compute_normal(attrib, mesh, index);
 			
-			for (size_t v = 0; v < fv; v++) {
-				tinyobj::index_t idx = mesh.indices[index_offset + v];
+			for (size_t start = index; index - start < mesh.num_face_vertices[f]; index++) {
+				tinyobj::index_t idx = mesh.indices[index];
 				auto idx_tuple = std::make_tuple(idx.vertex_index, idx.normal_index, idx.texcoord_index);
 				if (index_map.find(idx_tuple) == index_map.end()) {
-					cg::vertex& vertex = vertex_buffer->item(vertex_buffer_id);
+					cg::vertex& vertex = vertex_buffers[s]->item(vertex_buffer_id);
 					const auto& material = materials[mesh.material_ids[f]];
 					fill_vertex_data(vertex, attrib, idx, normal, material);
-					index_map[idx_tuple] = vertex_buffer_id;
-					vertex_buffer_id++;
+					index_map[idx_tuple] = vertex_buffer_id++;
 				}
-				index_buffer->item(index_buffer_id) = index_map[idx_tuple];
-				index_buffer_id++;
+				index_buffers[s]->item(index_buffer_id++) = index_map[idx_tuple];
 			}
-			index_offset += fv;
 		}
 
 		if (!materials[mesh.material_ids[0]].diffuse_texname.empty()) {

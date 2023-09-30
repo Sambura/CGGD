@@ -105,53 +105,42 @@ namespace cg::renderer
 			};
 
 			for (auto& vertex : vertices) {
-				float4 coords { vertex.pos.x, vertex.pos.y, vertex.pos.z, 1 };
-				auto processed_vertex = vertex_shader(coords, vertex);
+				auto data = vertex_shader(float4{ vertex.pos, 1 }, vertex);
+				float4 processed_position = data.first;
 
-				vertex.pos.x = processed_vertex.first.x / processed_vertex.first.w;
-				vertex.pos.y = processed_vertex.first.y / processed_vertex.first.w;
-				vertex.pos.z = processed_vertex.first.z / processed_vertex.first.w;
-
+				vertex.pos = processed_position.xyz() / processed_position.w;
 				vertex.pos.x = (vertex.pos.x + 1) * width / 2;
 				vertex.pos.y = (-vertex.pos.y + 1) * height / 2;
 			}
 
-			float2 vertex_a = float2 { vertices[0].pos.x, vertices[0].pos.y };
-			float2 vertex_b = float2 { vertices[1].pos.x, vertices[1].pos.y };
-			float2 vertex_c = float2 { vertices[2].pos.x, vertices[2].pos.y };
+			float2 vertex_a = vertices[0].pos.xy();
+			float2 vertex_b = vertices[1].pos.xy();
+			float2 vertex_c = vertices[2].pos.xy();
+			int2 min_coord { 0, 0 };
+			int2 max_coord { static_cast<int>(width), static_cast<int>(height) };
 
-			float2 min_vertex = min(vertex_a, min(vertex_b, vertex_c));
-			float2 bounding_box_begin = round(clamp(
-					min_vertex, 
-					float2{0, 0}, 
-					float2{static_cast<float>(width - 1), static_cast<float>(height - 1)}
-			));
+			int2 min_vertex { round(min(vertex_a, min(vertex_b, vertex_c))) };
+			int2 max_vertex { round(max(vertex_a, max(vertex_b, vertex_c))) };
 
-			float2 max_vertex = max(vertex_a, max(vertex_b, vertex_c));
-			float2 bounding_box_end = round(clamp(
-					max_vertex, 
-					float2{0, 0}, 
-					float2{static_cast<float>(width - 1), static_cast<float>(height - 1)}
-			));
+			uint2 bounding_box_begin { clamp(min_vertex, min_coord, max_coord) };
+			uint2 bounding_box_end { clamp(max_vertex, min_coord, max_coord) };
 
-			for (float x = bounding_box_begin.x; x <= bounding_box_end.x; x++) {
-				for (float y = bounding_box_begin.y; y <= bounding_box_end.y; y++) {
-					float2 point {x, y};
+			for (size_t x = bounding_box_begin.x; x < bounding_box_end.x; x++) {
+				for (size_t y = bounding_box_begin.y; y < bounding_box_end.y; y++) {
+					float2 point { static_cast<float>(x), static_cast<float>(y)};
 					float edge1 = edge_function(vertex_a, vertex_b, point);
 					float edge2 = edge_function(vertex_b, vertex_c, point);
 					float edge3 = edge_function(vertex_c, vertex_a, point);
 
 					if (edge1 >= 0 && edge2 >= 0 && edge3 >= 0) {
-						size_t u_x = static_cast<size_t>(x);
-						size_t u_y = static_cast<size_t>(y);
 						cg::fcolor pixel_result = pixel_shader(vertices[0], 0);
-						render_target->item(u_x, u_y) = cg::from_fcolor(pixel_result);
+						render_target->item(x, y) = cg::from_fcolor(pixel_result);
 					}
 				}
 			}
 		}
 	}
-
+	
 	template<typename VB, typename RT>
 	inline float
 	rasterizer<VB, RT>::edge_function(float2 a, float2 b, float2 c)

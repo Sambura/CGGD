@@ -58,14 +58,14 @@ void cg::renderer::renderer::move_forward(float delta)
 {
 	camera->set_position(
 			camera->get_position() +
-			camera->get_direction() * delta * frame_duration);
+			camera->get_forward() * delta * frame_duration);
 }
 
 void cg::renderer::renderer::move_backward(float delta)
 {
 	camera->set_position(
 			camera->get_position() -
-			camera->get_direction() * delta * frame_duration);
+			camera->get_forward() * delta * frame_duration);
 }
 
 void cg::renderer::renderer::move_left(float delta)
