@@ -14,12 +14,11 @@ std::chrono::steady_clock::time_point __pet_start_time;
 
 void cg::renderer::rasterization_renderer::init()
 {
-	// TODO Lab: 1.06 Add depth buffer in `cg::renderer::rasterization_renderer`
-	
 	rasterizer = std::make_shared<cg::renderer::rasterizer<cg::vertex, cg::ucolor>>();
 	rasterizer->set_viewport(settings->width, settings->height);
 	render_target = std::make_shared<cg::resource<cg::ucolor>>(settings->width, settings->height);
-	rasterizer->set_render_target(render_target);
+	depth_buffer = std::make_shared<cg::resource<float>>(settings->width, settings->height);
+	rasterizer->set_render_target(render_target, depth_buffer);
 
 	model = std::make_shared<cg::world::model>();
 	model->load_obj(settings->model_path);

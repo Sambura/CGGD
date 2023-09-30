@@ -55,8 +55,8 @@ namespace cg::renderer
 			std::shared_ptr<resource<RT>> in_render_target,
 			std::shared_ptr<resource<float>> in_depth_buffer)
 	{
-		// TODO Lab: 1.06 Adjust `set_render_target`, and `clear_render_target` methods of `cg::renderer::rasterizer` class to consume a depth buffer
 		if (in_render_target) render_target = in_render_target;
+		if (in_depth_buffer) depth_buffer = in_depth_buffer;
 	}
 
 	template<typename VB, typename RT>
@@ -70,10 +70,12 @@ namespace cg::renderer
 	inline void rasterizer<VB, RT>::clear_render_target(
 			const RT& in_clear_value, const float in_depth)
 	{
-		// TODO Lab: 1.06 Adjust `set_render_target`, and `clear_render_target` methods of `cg::renderer::rasterizer` class to consume a depth buffer
-		
 		for (size_t i = 0; i < render_target->get_number_of_elements(); i++) {
 			render_target->item(i) = in_clear_value;
+		}
+
+		for (size_t i = 0; i < depth_buffer->get_number_of_elements(); i++) {
+			depth_buffer->item(i) = in_depth;
 		}
 	}
 
@@ -94,8 +96,6 @@ namespace cg::renderer
 	template<typename VB, typename RT>
 	inline void rasterizer<VB, RT>::draw(size_t num_vertexes, size_t vertex_offset)
 	{
-		// TODO Lab: 1.06 Add `Depth test` stage to `draw` method of `cg::renderer::rasterizer`
-
 		size_t vertex_id = vertex_offset;
 		while (vertex_id < vertex_offset + num_vertexes) {
 			std::vector<VB> vertices {
@@ -125,6 +125,8 @@ namespace cg::renderer
 			uint2 bounding_box_begin { clamp(min_vertex, min_coord, max_coord) };
 			uint2 bounding_box_end { clamp(max_vertex, min_coord, max_coord) };
 
+			float triangle_edge = edge_function(vertex_a, vertex_b, vertex_c);
+
 			for (size_t x = bounding_box_begin.x; x < bounding_box_end.x; x++) {
 				for (size_t y = bounding_box_begin.y; y < bounding_box_end.y; y++) {
 					float2 point { static_cast<float>(x), static_cast<float>(y)};
@@ -133,8 +135,16 @@ namespace cg::renderer
 					float edge3 = edge_function(vertex_c, vertex_a, point);
 
 					if (edge1 >= 0 && edge2 >= 0 && edge3 >= 0) {
-						cg::fcolor pixel_result = pixel_shader(vertices[0], 0);
-						render_target->item(x, y) = cg::from_fcolor(pixel_result);
+						float u = edge2 / triangle_edge;
+						float v = edge3 / triangle_edge;
+						float w = edge1 / triangle_edge;
+						float z = u * vertices[0].pos.z + v * vertices[1].pos.z + w * vertices[2].pos.z;
+
+						if (depth_test(z, x, y)) {
+							cg::fcolor pixel_result = pixel_shader(vertices[0], z);
+							render_target->item(x, y) = cg::from_fcolor(pixel_result);
+							depth_buffer->item(x, y) = z;
+						}
 					}
 				}
 			}
@@ -143,20 +153,13 @@ namespace cg::renderer
 	
 	template<typename VB, typename RT>
 	inline float
-	rasterizer<VB, RT>::edge_function(float2 a, float2 b, float2 c)
-	{
+	rasterizer<VB, RT>::edge_function(float2 a, float2 b, float2 c) {
 		return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 	}
 
 	template<typename VB, typename RT>
-	inline bool rasterizer<VB, RT>::depth_test(float z, size_t x, size_t y)
-	{
-		// TODO Lab: 1.06 Implement `depth_test` function of `cg::renderer::rasterizer` class
-		if (!depth_buffer)
-		{
-			return true;
-		}
-		return depth_buffer->item(x, y) > z;
+	inline bool rasterizer<VB, RT>::depth_test(float z, size_t x, size_t y) {
+		return !depth_buffer || (depth_buffer->item(x, y) > z);
 	}
 
 } // namespace cg::renderer
