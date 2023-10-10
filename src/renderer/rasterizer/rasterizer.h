@@ -47,7 +47,7 @@ namespace cg::renderer
 		size_t height = 1080;
 
 		float edge_function(float2 a, float2 b, float2 c);
-		bool depth_test(float z, size_t x, size_t y);
+		bool z_test(float z, size_t x, size_t y);
 	};
 
 	template<typename VB, typename RT>
@@ -74,36 +74,35 @@ namespace cg::renderer
 			render_target->item(i) = in_clear_value;
 		}
 
-		for (size_t i = 0; i < depth_buffer->get_number_of_elements(); i++) {
-			depth_buffer->item(i) = in_depth;
+		if (depth_buffer) {
+			for (size_t i = 0; i < depth_buffer->get_number_of_elements(); i++) {
+				depth_buffer->item(i) = in_depth;
+			}
 		}
 	}
 
 	template<typename VB, typename RT>
-	inline void rasterizer<VB, RT>::set_vertex_buffer(
-			std::shared_ptr<resource<VB>> in_vertex_buffer)
-	{
+	inline void rasterizer<VB, RT>::set_vertex_buffer(std::shared_ptr<resource<VB>> in_vertex_buffer) {
 		vertex_buffer = in_vertex_buffer;
 	}
 
 	template<typename VB, typename RT>
-	inline void rasterizer<VB, RT>::set_index_buffer(
-			std::shared_ptr<resource<unsigned int>> in_index_buffer)
-	{
+	inline void rasterizer<VB, RT>::set_index_buffer(std::shared_ptr<resource<unsigned int>> in_index_buffer) {
 		index_buffer = in_index_buffer;
 	}
 
 	template<typename VB, typename RT>
-	inline void rasterizer<VB, RT>::draw(size_t num_vertexes, size_t vertex_offset)
-	{
+	inline void rasterizer<VB, RT>::draw(size_t num_vertexes, size_t vertex_offset) {
 		size_t vertex_id = vertex_offset;
 		while (vertex_id < vertex_offset + num_vertexes) {
+			// Assume we only work with triangles
 			std::vector<VB> vertices {
 				vertex_buffer->item(index_buffer->item(vertex_id++)),
 				vertex_buffer->item(index_buffer->item(vertex_id++)),
 				vertex_buffer->item(index_buffer->item(vertex_id++))
 			};
 
+			// apply some coordinate transformations + vertex shader to the triangle
 			for (auto& vertex : vertices) {
 				auto data = vertex_shader(float4{ vertex.pos, 1 }, vertex);
 				float4 processed_position = data.first;
@@ -111,41 +110,46 @@ namespace cg::renderer
 				vertex.pos = processed_position.xyz() / processed_position.w;
 				vertex.pos.x = (vertex.pos.x + 1) * width / 2;
 				vertex.pos.y = (-vertex.pos.y + 1) * height / 2;
+				// this line seems to help with edge drawing accuracy
+				vertex.pos.z = vertex.pos.z - 1;
 			}
-
+			
 			float2 vertex_a = vertices[0].pos.xy();
 			float2 vertex_b = vertices[1].pos.xy();
 			float2 vertex_c = vertices[2].pos.xy();
+
+			// calculate bounding box
 			int2 min_coord { 0, 0 };
 			int2 max_coord { static_cast<int>(width), static_cast<int>(height) };
-
-			int2 min_vertex { round(min(vertex_a, min(vertex_b, vertex_c))) };
-			int2 max_vertex { round(max(vertex_a, max(vertex_b, vertex_c))) };
-
+			int2 min_vertex { floor(min(vertex_a, min(vertex_b, vertex_c))) };
+			int2 max_vertex { ceil(max(vertex_a, max(vertex_b, vertex_c))) };
 			uint2 bounding_box_begin { clamp(min_vertex, min_coord, max_coord) };
 			uint2 bounding_box_end { clamp(max_vertex, min_coord, max_coord) };
 
+			// precalculated values
 			float triangle_edge = edge_function(vertex_a, vertex_b, vertex_c);
+			float z1 = vertices[0].pos.z / triangle_edge;
+			float z2 = vertices[1].pos.z / triangle_edge;
+			float z3 = vertices[2].pos.z / triangle_edge;
 
+			// Iterating over pixels in the bounding box
 			for (size_t x = bounding_box_begin.x; x < bounding_box_end.x; x++) {
 				for (size_t y = bounding_box_begin.y; y < bounding_box_end.y; y++) {
 					float2 point { static_cast<float>(x), static_cast<float>(y)};
+					// edge values determine, whether the pixel belongs to the triangle
 					float edge1 = edge_function(vertex_a, vertex_b, point);
 					float edge2 = edge_function(vertex_b, vertex_c, point);
 					float edge3 = edge_function(vertex_c, vertex_a, point);
 
-					if (edge1 >= 0 && edge2 >= 0 && edge3 >= 0) {
-						float u = edge2 / triangle_edge;
-						float v = edge3 / triangle_edge;
-						float w = edge1 / triangle_edge;
-						float z = u * vertices[0].pos.z + v * vertices[1].pos.z + w * vertices[2].pos.z;
+					if (edge1 < 0 || edge2 < 0 || edge3 < 0) continue;
 
-						if (depth_test(z, x, y)) {
-							cg::fcolor pixel_result = pixel_shader(vertices[0], z);
-							render_target->item(x, y) = cg::from_fcolor(pixel_result);
-							depth_buffer->item(x, y) = z;
-						}
-					}
+					float z = edge2 * z1 + edge3 * z2 + edge1 * z3;
+					if (z < -1 || z > 0) continue; // near/far camera clipping
+					if (!z_test(z, x, y)) continue;
+
+					cg::fcolor pixel_result = pixel_shader(vertices[0], z);
+					render_target->item(x, y) = cg::from_fcolor(pixel_result);
+					if (depth_buffer) depth_buffer->item(x, y) = z;
 				}
 			}
 		}
@@ -157,8 +161,9 @@ namespace cg::renderer
 		return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 	}
 
+	// Depth test. Things closer to camrea have lower depth value.
 	template<typename VB, typename RT>
-	inline bool rasterizer<VB, RT>::depth_test(float z, size_t x, size_t y) {
+	inline bool rasterizer<VB, RT>::z_test(float z, size_t x, size_t y) {
 		return !depth_buffer || (depth_buffer->item(x, y) > z);
 	}
 

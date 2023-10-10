@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 namespace cg
 {
@@ -22,11 +23,14 @@ namespace cg
 		float camera_angle_of_view;
 		float camera_z_near;
 		float camera_z_far;
+		bool disable_depth;
 
 		std::filesystem::path result_path;
 
 		unsigned raytracing_depth;
 		unsigned accumulation_num;
+
+		std::unordered_map<std::string, std::string> extra_options;
 	};
 
-}// namespace cg
+} // namespace cg

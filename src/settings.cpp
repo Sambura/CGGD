@@ -3,6 +3,7 @@
 #include "utils/error_handler.h"
 
 #include <cxxopts.hpp>
+#include <iostream>
 
 using namespace cg;
 
@@ -11,6 +12,7 @@ std::shared_ptr<settings> cg::settings::parse_settings(int argc, char** argv)
 	std::shared_ptr<cg::settings> settings = std::make_shared<cg::settings>();
 
 	cxxopts::Options options(argv[0], "Computer graphics in Game development");
+	options.allow_unrecognised_options();
 
 	auto add_options = options.add_options();
 	add_options("height", "Render target height", cxxopts::value<unsigned>()->default_value("1080"));
@@ -22,6 +24,7 @@ std::shared_ptr<settings> cg::settings::parse_settings(int argc, char** argv)
 	add_options("camera_angle_of_view", "Camera angle of view", cxxopts::value<float>()->default_value("60.0"));
 	add_options("camera_z_near", "Minimum expected depth", cxxopts::value<float>()->default_value("0.001"));
 	add_options("camera_z_far", "Maximum expected depth", cxxopts::value<float>()->default_value("100.0"));
+	add_options("disable_depth", "Disables depth buffer", cxxopts::value<bool>()->default_value("false"));
 	add_options("result_path", "Path to resulted image", cxxopts::value<std::filesystem::path>()->default_value("result.png"));
 	add_options("raytracing_depth", "Maximum number of traces rays", cxxopts::value<unsigned>()->default_value("1"));
 	add_options("accumulation_num", "Number of accumulated frames", cxxopts::value<unsigned>()->default_value("1"));
@@ -43,9 +46,25 @@ std::shared_ptr<settings> cg::settings::parse_settings(int argc, char** argv)
 	settings->camera_angle_of_view = result["camera_angle_of_view"].as<float>();
 	settings->camera_z_near = result["camera_z_near"].as<float>();
 	settings->camera_z_far = result["camera_z_far"].as<float>();
+	settings->disable_depth = result["disable_depth"].as<bool>();
 	settings->result_path = result["result_path"].as<std::filesystem::path>();
 	settings->raytracing_depth = result["raytracing_depth"].as<unsigned>();
 	settings->accumulation_num = result["accumulation_num"].as<unsigned>();
+
+	const cxxopts::OptionNames& extras = result.unmatched();
+	for (size_t i = 0; i < extras.size(); i++) {
+		const std::string& option = extras[i];
+		if (option[0] == '-') {
+			if (i + 1 < extras.size() && extras[i + 1][0] != '-') {
+				settings->extra_options[option] = extras[++i];
+				continue;
+			}
+
+			settings->extra_options[option] = "";
+		} else {
+			std::cerr << "Warning: unknown option: " << option << '\n';
+		}
+	}
 
 	return settings;
 }

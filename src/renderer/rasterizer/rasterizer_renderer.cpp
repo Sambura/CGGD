@@ -17,7 +17,10 @@ void cg::renderer::rasterization_renderer::init()
 	rasterizer = std::make_shared<cg::renderer::rasterizer<cg::vertex, cg::ucolor>>();
 	rasterizer->set_viewport(settings->width, settings->height);
 	render_target = std::make_shared<cg::resource<cg::ucolor>>(settings->width, settings->height);
-	depth_buffer = std::make_shared<cg::resource<float>>(settings->width, settings->height);
+
+	if (!settings->disable_depth)
+		depth_buffer = std::make_shared<cg::resource<float>>(settings->width, settings->height);
+	
 	rasterizer->set_render_target(render_target, depth_buffer);
 
 	model = std::make_shared<cg::world::model>();
@@ -34,6 +37,10 @@ void cg::renderer::rasterization_renderer::init()
 	camera->set_z_far(settings->camera_z_far);
 }
 
+typedef std::function<cg::fcolor (const cg::vertex&, float)> PixelShader;
+
+cg::fcolor ambient_pixel_shader(const cg::vertex& data, float z) { return data.ambient; }
+
 void cg::renderer::rasterization_renderer::render()
 {
 	float4x4 matrix = mul(
@@ -45,12 +52,10 @@ void cg::renderer::rasterization_renderer::render()
 		float4 processed = mul(matrix, vertex);
 		return std::make_pair(processed, data);
 	};
-	rasterizer->pixel_shader = [](cg::vertex data, float z) {
-		return data.ambient;
-	};
+	rasterizer->pixel_shader = ambient_pixel_shader;
 
 	PRINT_EXECUTION_TIME("Clear time", 
-		rasterizer->clear_render_target({15, 15, 15});
+		rasterizer->clear_render_target({80, 80, 80});
 	);
 
 	PRINT_EXECUTION_TIME("Draw time",

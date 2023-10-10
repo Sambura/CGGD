@@ -76,7 +76,11 @@ const DirectX::XMMATRIX camera::get_dxm_mvp_matrix() const
 // Returns matrix for 2D projection transformation
 // Transformed vector: { x, y, z, w }
 // x, y - projected coordinates
-// z - distance / depth (?)
+// z - distance to camera metric: 
+//			- < 0: too near, clipped
+// 			- [0..1]: from nearest to farthest
+//			- > 1: too far, clipped 
+//		this metric is highly non-linear
 // w - magic number, you should divide x, y, z by it
 const float4x4 cg::world::camera::get_projection_matrix() const
 {
