@@ -12,6 +12,10 @@ using namespace cg::world;
 
 cg::world::model::model() {}
 
+cg::world::model::model(const std::filesystem::path& model_path) {
+	load_obj(model_path);
+}
+
 cg::world::model::~model() {}
 
 void cg::world::model::load_obj(const std::filesystem::path& model_path)

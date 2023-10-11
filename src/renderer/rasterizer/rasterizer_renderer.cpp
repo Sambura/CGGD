@@ -23,8 +23,7 @@ void cg::renderer::rasterization_renderer::init()
 	
 	rasterizer->set_render_target(render_target, depth_buffer);
 
-	model = std::make_shared<cg::world::model>();
-	model->load_obj(settings->model_path);
+	model = std::make_shared<cg::world::model>(settings->model_path);
 
 	camera = std::make_shared<cg::world::camera>();
 	camera->set_height(static_cast<float>(settings->height));
@@ -39,7 +38,14 @@ void cg::renderer::rasterization_renderer::init()
 
 typedef std::function<cg::fcolor (const cg::vertex&, float)> PixelShader;
 
+cg::fcolor empty_pixel_shader(const cg::vertex& data, float z) { return {0,0,0}; }
 cg::fcolor ambient_pixel_shader(const cg::vertex& data, float z) { return data.ambient; }
+
+PixelShader depth_pixel_shader(float bias, float fade) {
+	return [bias, fade](const cg::vertex& data, float z) {
+		return data.ambient * (1 + std::clamp(bias + fade / z, -1.f, 0.f));
+	};
+}
 
 void cg::renderer::rasterization_renderer::render()
 {
@@ -52,10 +58,17 @@ void cg::renderer::rasterization_renderer::render()
 		float4 processed = mul(matrix, vertex);
 		return std::make_pair(processed, data);
 	};
-	rasterizer->pixel_shader = ambient_pixel_shader;
+
+	auto it = settings->extra_options.find("--lps_fade");
+	float fade = (it != settings->extra_options.end()) ? std::stof(it->second) : 0.0001f;
+	it = settings->extra_options.find("--lps_bias");
+	float bias = (it != settings->extra_options.end()) ? std::stof(it->second) : 600 * fade * length(camera->get_position());
+	it = settings->extra_options.find("--zshader");
+
+	rasterizer->pixel_shader = (it != settings->extra_options.end()) ? depth_pixel_shader(bias, fade) : ambient_pixel_shader;
 
 	PRINT_EXECUTION_TIME("Clear time", 
-		rasterizer->clear_render_target({80, 80, 80});
+		rasterizer->clear_render_target({0, 0, 0});
 	);
 
 	PRINT_EXECUTION_TIME("Draw time",

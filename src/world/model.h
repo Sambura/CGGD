@@ -15,6 +15,7 @@ namespace cg::world
 	{
 	public:
 		model();
+		explicit model(const std::filesystem::path& model_path);
 		virtual ~model();
 
 		void load_obj(const std::filesystem::path& model_path);
