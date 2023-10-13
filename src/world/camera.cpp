@@ -76,14 +76,11 @@ const DirectX::XMMATRIX camera::get_dxm_mvp_matrix() const
 // Returns matrix for 2D projection transformation
 // Transformed vector: { x, y, z, w }
 // x, y - projected coordinates
-// z - distance to camera metric: 
-//			- < 0: too near, clipped
-// 			- [0..1]: from nearest to farthest
-//			- > 1: too far, clipped 
-//		this metric is highly non-linear
+// z - distance to the camera (???)
 // w - magic number, you should divide x, y, z by it
 const float4x4 cg::world::camera::get_projection_matrix() const
 {
+	// our FOV is (apparently) vertical
 	float f = 1.f / tanf(field_of_view / 2);
 	return float4x4 {
 		{ f / aspect_ratio, 0, 0, 0 },

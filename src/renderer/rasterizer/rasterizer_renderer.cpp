@@ -43,7 +43,13 @@ cg::fcolor ambient_pixel_shader(const cg::vertex& data, float z) { return data.a
 
 PixelShader depth_pixel_shader(float bias, float fade) {
 	return [bias, fade](const cg::vertex& data, float z) {
-		return data.ambient * (1 + std::clamp(bias + fade / z, -1.f, 0.f));
+		return data.ambient * (1 + std::clamp(bias - fade * z, -1.f, 0.f));
+	};
+}
+
+PixelShader fog_pixel_shader(float bias, float fade) {
+	return [bias, fade](const cg::vertex& data, float z) {
+		return data.ambient + cg::fcolor{0.7f} * std::clamp(fade * z - bias, 0.f, 1.f);
 	};
 }
 
@@ -63,9 +69,10 @@ void cg::renderer::rasterization_renderer::render()
 	float fade = (it != settings->extra_options.end()) ? std::stof(it->second) : 0.0001f;
 	it = settings->extra_options.find("--lps_bias");
 	float bias = (it != settings->extra_options.end()) ? std::stof(it->second) : 600 * fade * length(camera->get_position());
-	it = settings->extra_options.find("--zshader");
+	bool zshader = settings->extra_options.find("--zshader") != settings->extra_options.end();
+	bool fogshader = settings->extra_options.find("--fogshader") != settings->extra_options.end();
 
-	rasterizer->pixel_shader = (it != settings->extra_options.end()) ? depth_pixel_shader(bias, fade) : ambient_pixel_shader;
+	rasterizer->pixel_shader = zshader ? depth_pixel_shader(bias, fade) : (fogshader ? fog_pixel_shader(bias, fade) : ambient_pixel_shader);
 
 	PRINT_EXECUTION_TIME("Clear time", 
 		rasterizer->clear_render_target({0, 0, 0});
@@ -84,6 +91,9 @@ void cg::renderer::rasterization_renderer::render()
 
 	// save render target as an image at `settings->result_path`
 	cg::utils::save_resource(*render_target, settings->result_path);
+	if (!settings->depth_result_path.empty() && depth_buffer)
+		cg::utils::save_resource(*depth_buffer, settings->depth_result_path);
+	cg::utils::open_file_with_system_app(settings->result_path);
 }
 
 void cg::renderer::rasterization_renderer::destroy() {}

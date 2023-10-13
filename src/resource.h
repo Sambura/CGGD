@@ -73,6 +73,7 @@ namespace cg
 		fcolor ambient;
 		fcolor diffuse;
 		fcolor emissive;
+		float depth;
 	};
 
 } // namespace cg

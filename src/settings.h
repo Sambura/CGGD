@@ -26,6 +26,7 @@ namespace cg
 		bool disable_depth;
 
 		std::filesystem::path result_path;
+		std::filesystem::path depth_result_path;
 
 		unsigned raytracing_depth;
 		unsigned accumulation_num;

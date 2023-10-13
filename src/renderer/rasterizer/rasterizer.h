@@ -106,12 +106,10 @@ namespace cg::renderer
 			for (auto& vertex : vertices) {
 				auto data = vertex_shader(float4{ vertex.pos, 1 }, vertex);
 				float4 processed_position = data.first;
-
 				vertex.pos = processed_position.xyz() / processed_position.w;
 				vertex.pos.x = (vertex.pos.x + 1) * width / 2;
 				vertex.pos.y = (-vertex.pos.y + 1) * height / 2;
-				// this line seems to help with edge drawing accuracy
-				vertex.pos.z = vertex.pos.z - 1;
+				vertex.depth = processed_position.z;
 			}
 			
 			float2 vertex_a = vertices[0].pos.xy();
@@ -128,9 +126,13 @@ namespace cg::renderer
 
 			// precalculated values
 			float triangle_edge = edge_function(vertex_a, vertex_b, vertex_c);
-			float z1 = vertices[0].pos.z / triangle_edge;
-			float z2 = vertices[1].pos.z / triangle_edge;
-			float z3 = vertices[2].pos.z / triangle_edge;
+			float avgZ = (vertices[0].pos.z + vertices[1].pos.z + vertices[2].pos.z) / 3;
+			float z1 = (vertices[0].pos.z - avgZ) / triangle_edge;
+			float z2 = (vertices[1].pos.z - avgZ) / triangle_edge;
+			float z3 = (vertices[2].pos.z - avgZ) / triangle_edge;
+			float depth1 = vertices[0].depth / triangle_edge;
+			float depth2 = vertices[1].depth / triangle_edge;
+			float depth3 = vertices[2].depth / triangle_edge;
 
 			// Iterating over pixels in the bounding box
 			for (size_t x = bounding_box_begin.x; x < bounding_box_end.x; x++) {
@@ -143,11 +145,12 @@ namespace cg::renderer
 
 					if (edge1 < 0 || edge2 < 0 || edge3 < 0) continue;
 
-					float z = edge2 * z1 + edge3 * z2 + edge1 * z3;
-					if (z < -1 || z > 0) continue; // near/far camera clipping
+					float z = edge2 * z1 + edge3 * z2 + edge1 * z3 + avgZ;
+					if (z < 0 || z > 1) continue; // near/far camera clipping
 					if (!z_test(z, x, y)) continue;
-
-					cg::fcolor pixel_result = pixel_shader(vertices[0], z);
+					
+					float zDepth = edge2 * depth1 + edge3 * depth2 + edge1 * depth3;
+					cg::fcolor pixel_result = pixel_shader(vertices[0], zDepth);
 					render_target->item(x, y) = cg::from_fcolor(pixel_result);
 					if (depth_buffer) depth_buffer->item(x, y) = z;
 				}
@@ -161,7 +164,7 @@ namespace cg::renderer
 		return (c.x - a.x) * (b.y - a.y) - (c.y - a.y) * (b.x - a.x);
 	}
 
-	// Depth test. Things closer to camrea have lower depth value.
+	// Depth test. Things closer to camera have lower depth value.
 	template<typename VB, typename RT>
 	inline bool rasterizer<VB, RT>::z_test(float z, size_t x, size_t y) {
 		return !depth_buffer || (depth_buffer->item(x, y) > z);

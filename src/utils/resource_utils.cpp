@@ -6,6 +6,7 @@
 #include "utils/error_handler.h"
 
 #include <stb_image_write.h>
+#include <fstream>
 
 
 using namespace cg::utils;
@@ -21,6 +22,10 @@ std::string view_command(const std::filesystem::path& path)
 	return path.string();
 }
 
+void cg::utils::open_file_with_system_app(const std::filesystem::path& filepath) {
+	std::system(view_command(filepath).c_str());
+}
+
 void cg::utils::save_resource(cg::resource<cg::ucolor>& render_target, const std::filesystem::path& filepath)
 {
 	int width = static_cast<int>(render_target.get_stride());
@@ -32,7 +37,16 @@ void cg::utils::save_resource(cg::resource<cg::ucolor>& render_target, const std
 
 	if (result != 1)
 		THROW_ERROR("Can't save the resource");
-
-	std::system(view_command(filepath).c_str());
 }
 
+void cg::utils::save_resource(cg::resource<float>& depth_buffer, const std::filesystem::path& filepath)
+{
+	std::ofstream fs(filepath, std::ios::out | std::ios::binary);
+
+	fs.write(
+		reinterpret_cast<const char*>(depth_buffer.get_data()), 
+		depth_buffer.get_number_of_elements() * sizeof(float)
+	);
+    
+    fs.close();
+}
