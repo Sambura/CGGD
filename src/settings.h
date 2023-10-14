@@ -24,6 +24,7 @@ namespace cg
 		float camera_z_near;
 		float camera_z_far;
 		bool disable_depth;
+		bool show_render;
 
 		std::filesystem::path result_path;
 		std::filesystem::path depth_result_path;

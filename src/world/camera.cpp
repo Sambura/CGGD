@@ -42,8 +42,8 @@ const float4x4 cg::world::camera::get_view_matrix() const {
 	// And yes, for some reason our camera's look direction 
 	// and z-axis are opposites ¯\_(ツ)_/¯
 	float3 z_axis = -get_forward();
-	float3 x_axis = cross(float3{ 0, 1, 0 }, z_axis);
-	float3 y_axis = cross(z_axis, x_axis);
+	float3 x_axis = normalize(cross(float3{ 0, 1, 0 }, z_axis));
+	float3 y_axis = normalize(cross(z_axis, x_axis));
 
 	return float4x4 { 
 		{x_axis.x, y_axis.x, z_axis.x, 0}, 

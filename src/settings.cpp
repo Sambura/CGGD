@@ -28,6 +28,7 @@ std::shared_ptr<settings> cg::settings::parse_settings(int argc, char** argv)
 	add_options("result_path", "Path to resulted image", cxxopts::value<std::filesystem::path>()->default_value("result.png"));
 	// apparently empty default value is illegal in this library 
 	add_options("depth_export_path", "Exports the raw depth map as a binary file", cxxopts::value<std::filesystem::path>()->default_value("~~~~~~~~~~"));
+	add_options("nodisplay", "Disables resulting image display", cxxopts::value<bool>()->default_value("false"));
 	add_options("raytracing_depth", "Maximum number of traces rays", cxxopts::value<unsigned>()->default_value("1"));
 	add_options("accumulation_num", "Number of accumulated frames", cxxopts::value<unsigned>()->default_value("1"));
 	add_options("h,help", "Print usage");
@@ -52,6 +53,7 @@ std::shared_ptr<settings> cg::settings::parse_settings(int argc, char** argv)
 	settings->result_path = result["result_path"].as<std::filesystem::path>();
 	settings->depth_result_path = result["depth_export_path"].as<std::filesystem::path>();
 	if (settings->depth_result_path == "~~~~~~~~~~") settings->depth_result_path = "";
+	settings->show_render = !result["nodisplay"].as<bool>();
 	settings->raytracing_depth = result["raytracing_depth"].as<unsigned>();
 	settings->accumulation_num = result["accumulation_num"].as<unsigned>();
 

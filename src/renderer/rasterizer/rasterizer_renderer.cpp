@@ -12,8 +12,7 @@ std::chrono::steady_clock::time_point __pet_start_time;
 			std::chrono::high_resolution_clock::now() - __pet_start_time) \
 		).count() << " ms.\n";
 
-void cg::renderer::rasterization_renderer::init()
-{
+void cg::renderer::rasterization_renderer::init() {
 	rasterizer = std::make_shared<cg::renderer::rasterizer<cg::vertex, cg::ucolor>>();
 	rasterizer->set_viewport(settings->width, settings->height);
 	render_target = std::make_shared<cg::resource<cg::ucolor>>(settings->width, settings->height);
@@ -93,7 +92,7 @@ void cg::renderer::rasterization_renderer::render()
 	cg::utils::save_resource(*render_target, settings->result_path);
 	if (!settings->depth_result_path.empty() && depth_buffer)
 		cg::utils::save_resource(*depth_buffer, settings->depth_result_path);
-	cg::utils::open_file_with_system_app(settings->result_path);
+	if (settings->show_render) cg::utils::open_file_with_system_app(settings->result_path);
 }
 
 void cg::renderer::rasterization_renderer::destroy() {}

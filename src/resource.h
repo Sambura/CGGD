@@ -64,6 +64,7 @@ namespace cg
 	using fcolor = float3;
 
 	inline ucolor from_fcolor(fcolor color) { return static_cast<ucolor>(clamp(color * 255, 0, 255)); };
+	inline fcolor from_ucolor(ucolor color) { return static_cast<fcolor>(static_cast<fcolor>(color) / 255); };
 
 	struct vertex
 	{
