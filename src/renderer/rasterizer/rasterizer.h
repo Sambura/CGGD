@@ -153,10 +153,9 @@ namespace cg::renderer
 					float uv_edge1 = edge1 / (vertices[2].pos.z * vertices[2].pos.w);
 					float uv_edge2 = edge2 / (vertices[0].pos.z * vertices[0].pos.w);
 					float uv_edge3 = edge3 / (vertices[1].pos.z * vertices[1].pos.w);
-					float z_inv = (uv_edge1 + uv_edge2 + uv_edge3) / triangle_edge;
-					float2 uv_raw = (uv_edge2 * vertices[0].uv + uv_edge3 * vertices[1].uv + uv_edge1 * vertices[2].uv) / triangle_edge;
+					float2 uv_raw = uv_edge2 * vertices[0].uv + uv_edge3 * vertices[1].uv + uv_edge1 * vertices[2].uv;
 					
-					pixel_vertex.uv = uv_raw / z_inv;
+					pixel_vertex.uv = uv_raw / (uv_edge1 + uv_edge2 + uv_edge3);
 					pixel_vertex.ambient = (edge2 * vertices[0].ambient + edge3 * vertices[1].ambient + edge1 * vertices[2].ambient) / triangle_edge;
 					cg::fcolor pixel_result = pixel_shader(pixel_vertex, data);
 					render_target->item(x, y) = cg::from_fcolor(pixel_result);
