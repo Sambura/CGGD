@@ -67,7 +67,7 @@ float3 get_vert_pos(const tinyobj::attrib_t& attrib, const tinyobj::index_t inde
 	return float3 {
 		attrib.vertices[3 * index.vertex_index],
 		attrib.vertices[3 * index.vertex_index + 1],
-		attrib.vertices[3 * index.vertex_index + 2],
+		attrib.vertices[3 * index.vertex_index + 2]
 	};
 }
 
@@ -102,7 +102,7 @@ float3 cg::world::model::compute_normal(const tinyobj::attrib_t& attrib, const t
 void model::fill_vertex_data(cg::vertex& vertex, const tinyobj::attrib_t& attrib, const tinyobj::index_t idx, 
 		const float3 computed_normal, const tinyobj::material_t material)
 {
-	vertex.pos = get_vert_pos(attrib, idx);
+	vertex.pos = float4 { get_vert_pos(attrib, idx), 1 };
 	vertex.norm = (idx.normal_index < 0) ? computed_normal : get_vert_norm(attrib, idx);
 	vertex.uv = (idx.texcoord_index < 0) ? float2{0, 0} : get_vert_uv(attrib, idx);
 	vertex.ambient = cast_tiny_real3(material.ambient);

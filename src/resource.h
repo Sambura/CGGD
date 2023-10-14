@@ -68,13 +68,12 @@ namespace cg
 
 	struct vertex
 	{
-		float3 pos;
+		float4 pos;
 		float3 norm;
 		float2 uv;
 		fcolor ambient;
 		fcolor diffuse;
 		fcolor emissive;
-		float depth;
 	};
 
 } // namespace cg

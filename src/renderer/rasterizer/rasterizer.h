@@ -32,10 +32,10 @@ namespace cg::renderer
 
 		void set_viewport(size_t in_width, size_t in_height);
 
-		void draw(size_t num_vertexes, size_t vertex_offset);
+		void draw(size_t num_vertexes, size_t vertex_offset, void* data);
 
-		std::function<std::pair<float4, VB>(float4 vertex, VB vertex_data)> vertex_shader;
-		std::function<cg::fcolor(const VB& vertex_data, const float z)> pixel_shader;
+		std::function<VB(VB vertex_data)> vertex_shader;
+		std::function<cg::fcolor(const VB& vertex_data, void* data)> pixel_shader;
 
 	protected:
 		std::shared_ptr<cg::resource<VB>> vertex_buffer;
@@ -92,8 +92,10 @@ namespace cg::renderer
 	}
 
 	template<typename VB, typename RT>
-	inline void rasterizer<VB, RT>::draw(size_t num_vertexes, size_t vertex_offset) {
+	inline void rasterizer<VB, RT>::draw(size_t num_vertexes, size_t vertex_offset, void* data) {
 		size_t vertex_id = vertex_offset;
+		std::vector<float2> vertices_2d(3);
+
 		while (vertex_id < vertex_offset + num_vertexes) {
 			// Assume we only work with triangles
 			std::vector<VB> vertices {
@@ -103,54 +105,53 @@ namespace cg::renderer
 			};
 
 			// apply some coordinate transformations + vertex shader to the triangle
-			for (auto& vertex : vertices) {
-				auto data = vertex_shader(float4{ vertex.pos, 1 }, vertex);
-				float4 processed_position = data.first;
-				vertex.pos = processed_position.xyz() / processed_position.w;
-				vertex.pos.x = (vertex.pos.x + 1) * width / 2;
-				vertex.pos.y = (-vertex.pos.y + 1) * height / 2;
-				vertex.depth = processed_position.z;
+			for (int i = 0; i < 3; i++) {
+				auto& vertex = vertices[i];
+				vertex = vertex_shader(vertex);
+				vertex.pos.xyz() /= vertex.pos.w;
+
+				vertices_2d[i] = float2 {
+					(1 + vertex.pos.x) * width / 2,
+					(1 - vertex.pos.y) * height / 2
+				};
 			}
-			
-			float2 vertex_a = vertices[0].pos.xy();
-			float2 vertex_b = vertices[1].pos.xy();
-			float2 vertex_c = vertices[2].pos.xy();
 
 			// calculate bounding box
 			int2 min_coord { 0, 0 };
 			int2 max_coord { static_cast<int>(width), static_cast<int>(height) };
-			int2 min_vertex { floor(min(vertex_a, min(vertex_b, vertex_c))) };
-			int2 max_vertex { ceil(max(vertex_a, max(vertex_b, vertex_c))) };
+			int2 min_vertex { floor(min(vertices_2d[0], min(vertices_2d[1], vertices_2d[2]))) };
+			int2 max_vertex { ceil(max(vertices_2d[0], max(vertices_2d[1], vertices_2d[2]))) };
 			uint2 bounding_box_begin { clamp(min_vertex, min_coord, max_coord) };
 			uint2 bounding_box_end { clamp(max_vertex, min_coord, max_coord) };
 
 			// precalculated values
-			float triangle_edge = edge_function(vertex_a, vertex_b, vertex_c);
-			float avgZ = (vertices[0].pos.z + vertices[1].pos.z + vertices[2].pos.z) / 3;
-			float z1 = (vertices[0].pos.z - avgZ) / triangle_edge;
-			float z2 = (vertices[1].pos.z - avgZ) / triangle_edge;
-			float z3 = (vertices[2].pos.z - avgZ) / triangle_edge;
-			float depth1 = vertices[0].depth / triangle_edge;
-			float depth2 = vertices[1].depth / triangle_edge;
-			float depth3 = vertices[2].depth / triangle_edge;
+			float triangle_edge = edge_function(vertices_2d[0], vertices_2d[1], vertices_2d[2]);
+			if (triangle_edge < 0) continue; // triangle faces backwards (i think)
+			cg::vertex pixel_vertex;
+			float4 avgPos = (vertices[0].pos + vertices[1].pos + vertices[2].pos) / 3;
+			float4 pos1 = vertices[0].pos - avgPos;
+			float4 pos2 = vertices[1].pos - avgPos;
+			float4 pos3 = vertices[2].pos - avgPos;
 
 			// Iterating over pixels in the bounding box
 			for (size_t x = bounding_box_begin.x; x < bounding_box_end.x; x++) {
 				for (size_t y = bounding_box_begin.y; y < bounding_box_end.y; y++) {
 					float2 point { static_cast<float>(x), static_cast<float>(y)};
 					// edge values determine, whether the pixel belongs to the triangle
-					float edge1 = edge_function(vertex_a, vertex_b, point);
-					float edge2 = edge_function(vertex_b, vertex_c, point);
-					float edge3 = edge_function(vertex_c, vertex_a, point);
+					float edge1 = edge_function(vertices_2d[0], vertices_2d[1], point);
+					float edge2 = edge_function(vertices_2d[1], vertices_2d[2], point);
+					float edge3 = edge_function(vertices_2d[2], vertices_2d[0], point);
 
-					if (edge1 < 0 || edge2 < 0 || edge3 < 0) continue;
-
-					float z = edge2 * z1 + edge3 * z2 + edge1 * z3 + avgZ;
+					if (edge1 < 0 || edge2 < 0 || edge3 < 0 || edge1 > triangle_edge || edge2 > triangle_edge || edge3 > triangle_edge) continue;
+					// interpolate pixel coordinates
+					pixel_vertex.pos = (edge2 * pos1 + edge3 * pos2 + edge1 * pos3) / triangle_edge + avgPos;
+					float z = pixel_vertex.pos.z;
 					if (z < 0 || z > 1) continue; // near/far camera clipping
 					if (!z_test(z, x, y)) continue;
-					
-					float zDepth = edge2 * depth1 + edge3 * depth2 + edge1 * depth3;
-					cg::fcolor pixel_result = pixel_shader(vertices[0], zDepth);
+
+					pixel_vertex.uv = (edge2 * vertices[0].uv + edge3 * vertices[1].uv + edge1 * vertices[2].uv) / triangle_edge;
+					pixel_vertex.ambient = (edge2 * vertices[0].ambient + edge3 * vertices[1].ambient + edge1 * vertices[2].ambient) / triangle_edge;
+					cg::fcolor pixel_result = pixel_shader(pixel_vertex, data);
 					render_target->item(x, y) = cg::from_fcolor(pixel_result);
 					if (depth_buffer) depth_buffer->item(x, y) = z;
 				}
