@@ -47,7 +47,7 @@ namespace cg::renderer
 		size_t height = 1080;
 
 		float edge_function(float2 a, float2 b, float2 c);
-		bool z_test(float z, size_t x, size_t y);
+		bool depth_test(float z, size_t x, size_t y);
 	};
 
 	template<typename VB, typename RT>
@@ -125,8 +125,8 @@ namespace cg::renderer
 			uint2 bounding_box_end { clamp(max_vertex, min_coord, max_coord) };
 
 			// precalculated values
-			float triangle_edge = edge_function(vertices_2d[0], vertices_2d[1], vertices_2d[2]);
-			if (triangle_edge < 0) continue; // triangle faces backwards (i think)
+			float triangle_area = edge_function(vertices_2d[0], vertices_2d[1], vertices_2d[2]);
+			if (triangle_area < 0) continue; // cull backwards facing triangles
 			cg::vertex pixel_vertex;
 			float4 avgPos = (vertices[0].pos + vertices[1].pos + vertices[2].pos) / 3;
 			float4 pos1 = vertices[0].pos - avgPos;
@@ -138,16 +138,18 @@ namespace cg::renderer
 				for (size_t y = bounding_box_begin.y; y < bounding_box_end.y; y++) {
 					float2 point { static_cast<float>(x), static_cast<float>(y)};
 					// edge values determine, whether the pixel belongs to the triangle
-					float edge1 = edge_function(vertices_2d[0], vertices_2d[1], point);
-					float edge2 = edge_function(vertices_2d[1], vertices_2d[2], point);
-					float edge3 = edge_function(vertices_2d[2], vertices_2d[0], point);
+					float edge1 = edge_function(vertices_2d[0], vertices_2d[1], point) / triangle_area;
+					float edge2 = edge_function(vertices_2d[1], vertices_2d[2], point) / triangle_area;
+					float edge3 = edge_function(vertices_2d[2], vertices_2d[0], point) / triangle_area;
 
-					if (edge1 < 0 || edge2 < 0 || edge3 < 0 || edge1 > triangle_edge || edge2 > triangle_edge || edge3 > triangle_edge) continue;
+					if (edge1 < 0 || edge2 < 0 || edge3 < 0 ) continue;
+					if (edge1 > 1 || edge2 > 1 || edge3 > 1 ) continue;
+
 					// interpolate pixel coordinates
-					pixel_vertex.pos = (edge2 * pos1 + edge3 * pos2 + edge1 * pos3) / triangle_edge + avgPos;
+					pixel_vertex.pos = (edge2 * pos1 + edge3 * pos2 + edge1 * pos3) + avgPos;
 					float z = pixel_vertex.pos.z;
 					if (z < 0 || z > 1) continue; // near/far camera clipping
-					if (!z_test(z, x, y)) continue;
+					if (!depth_test(z, x, y)) continue;
 
 					// This is perspective correct texture mapping (from wikipedia)
 					float uv_edge1 = edge1 / (vertices[2].pos.z * vertices[2].pos.w);
@@ -156,7 +158,8 @@ namespace cg::renderer
 					float2 uv_raw = uv_edge2 * vertices[0].uv + uv_edge3 * vertices[1].uv + uv_edge1 * vertices[2].uv;
 					
 					pixel_vertex.uv = uv_raw / (uv_edge1 + uv_edge2 + uv_edge3);
-					pixel_vertex.ambient = (edge2 * vertices[0].ambient + edge3 * vertices[1].ambient + edge1 * vertices[2].ambient) / triangle_edge;
+					pixel_vertex.ambient = edge2 * vertices[0].ambient + edge3 * vertices[1].ambient + edge1 * vertices[2].ambient;
+					
 					cg::fcolor pixel_result = pixel_shader(pixel_vertex, data);
 					render_target->item(x, y) = cg::from_fcolor(pixel_result);
 					if (depth_buffer) depth_buffer->item(x, y) = z;
@@ -173,7 +176,7 @@ namespace cg::renderer
 
 	// Depth test. Things closer to camera have lower depth value.
 	template<typename VB, typename RT>
-	inline bool rasterizer<VB, RT>::z_test(float z, size_t x, size_t y) {
+	inline bool rasterizer<VB, RT>::depth_test(float z, size_t x, size_t y) {
 		return !depth_buffer || (depth_buffer->item(x, y) > z);
 	}
 
