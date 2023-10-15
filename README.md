@@ -1,28 +1,26 @@
-# Computer graphics in Game development course
+# Computer graphics in Game development
 
-This repo contains a template for Computer graphics in Game development labs
+This repo contains a implementations of different rendering techniques from scratch
 
-## Pre-requirements
+## Requirements
 
-- Version control: [Git](https://git-scm.com/)
-- Build automation: [CMake](https://cmake.org/download/)
-- C++ compiler: MSVC on Windows, Clang on MacOS, GCC on Linux (C++17 compatible)
+- [CMake](https://cmake.org/download/)
+- C++17 compatible C++ compiler
 - [OpenMP library](https://www.openmp.org/)
-- C++ IDE: [CLion](https://www.jetbrains.com/clion/)
 
 For DirectX12 you need a Windows machine or VM with installed software and [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/)
 
 ## How to build the solution
 
-Use `git clone --recursive` to clone the repo with submodules or run `git submodule update --init --recursive` after the first clone.
-
 Go to the project folder and run the next command:
 
 ```sh
-mkdir Build
-cd Build
+mkdir build
+cd build
 cmake ..
+cmake --build . --config Release
 ```
+The folder `build/Release/` should contain the resuling executalbes
 
 ## Third-party tools and data
 
