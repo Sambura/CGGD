@@ -16,14 +16,15 @@ std::string view_command(const std::filesystem::path& path)
 #ifdef __APPLE__
 	return std::string("open ").append(path.string());
 #endif
-#ifdef __WINDOWS__
+#ifdef _WIN32
 	return std::string("start ").append(path.string());
 #endif
-	return path.string();
+	return "";
 }
 
 void cg::utils::open_file_with_system_app(const std::filesystem::path& filepath) {
-	std::system(view_command(filepath).c_str());
+	auto command = view_command(filepath);
+	if (!command.empty()) std::system(command.c_str());
 }
 
 void cg::utils::save_resource(cg::resource<cg::ucolor>& render_target, const std::filesystem::path& filepath)
