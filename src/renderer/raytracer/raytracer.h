@@ -192,7 +192,6 @@ namespace cg::renderer
 	inline payload raytracer<VB, RT>::trace_ray(
 			const ray& ray, size_t depth, float max_t, float min_t) const
 	{
-		// TODO Lab: 2.04 Adjust `trace_ray` method of `raytracer` to use `any_hit_shader`
 		// TODO Lab: 2.05 Adjust `trace_ray` method of `raytracer` class to traverse the acceleration structure
 
 		if (depth-- == 0) return miss_shader(ray);
@@ -206,6 +205,7 @@ namespace cg::renderer
 			if (payload.t >= min_t && closest_intersection.t > payload.t) {
 				closest_intersection = payload;
 				closest_triangle = &triangle;
+				if (any_hit_shader) return any_hit_shader(ray, payload, triangle);
 			}
 		}
 

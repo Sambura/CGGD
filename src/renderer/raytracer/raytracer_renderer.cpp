@@ -15,16 +15,18 @@ std::chrono::steady_clock::time_point __pet_start_time;
 		).count() << " ms.\n";
 
 void cg::renderer::ray_tracing_renderer::init() {
-	// TODO Lab: 2.04 Initialize `shadow_raytracer` in `ray_tracing_renderer`
+	model = std::make_shared<cg::world::model>(settings->model_path);
 
 	raytracer = std::make_shared<cg::renderer::raytracer<cg::vertex, cg::ucolor>>();
 	raytracer->set_viewport(settings->width, settings->height);
 	render_target = std::make_shared<cg::resource<cg::ucolor>>(settings->width, settings->height);
 	raytracer->set_render_target(render_target);
-
-	model = std::make_shared<cg::world::model>(settings->model_path);
 	raytracer->set_vertex_buffers(model->get_vertex_buffers());
 	raytracer->set_index_buffers(model->get_index_buffers());
+
+	shadow_raytracer = std::make_shared<cg::renderer::raytracer<cg::vertex, cg::ucolor>>();
+	shadow_raytracer->set_vertex_buffers(model->get_vertex_buffers());
+	shadow_raytracer->set_index_buffers(model->get_index_buffers());
 
 	lights.push_back({
 		float3{0, 1.58f, -0.03f},
@@ -46,20 +48,19 @@ void cg::renderer::ray_tracing_renderer::destroy() {}
 
 void cg::renderer::ray_tracing_renderer::update() {}
 
+cg::renderer::payload skybox_shader(const cg::renderer::ray& ray) {
+	cg::renderer::payload payload{}; 
+	payload.color = cg::fcolor{0.f, 0.f, ray.direction.y / 2 + 0.5f}; 
+	return payload; 
+}
+
 void cg::renderer::ray_tracing_renderer::render() {
-	// TODO Lab: 2.03 Adjust `closest_hit_shader` of `raytracer` to implement Lambertian shading model
-	// TODO Lab: 2.04 Define `any_hit_shader` and `miss_shader` for `shadow_raytracer`
-	// TODO Lab: 2.04 Adjust `closest_hit_shader` of `raytracer` to cast shadows rays and to ignore occluded lights
 	// TODO Lab: 2.05 Adjust `ray_tracing_renderer` class to build the acceleration structure
 	// TODO Lab: 2.06 (Bonus) Adjust `closest_hit_shader` for Monte-Carlo light tracing
 	
 	// TODO: Take angle of view into account
 
-	raytracer->miss_shader = [](const ray& ray) { 
-		payload payload{}; 
-		payload.color = cg::fcolor{0.f, 0.f, ray.direction.y / 2 + 0.5f}; 
-		return payload; 
-	};
+	raytracer->miss_shader = skybox_shader;
 	raytracer->closest_hit_shader = [&](const ray& ray, payload& payload, const triangle<cg::vertex>& triangle, size_t depth) {
 		payload.color = triangle.emissive;
 		float3 position = ray.position + ray.direction * payload.t;
@@ -67,13 +68,25 @@ void cg::renderer::ray_tracing_renderer::render() {
 		
 		for (auto& light : lights) {
 			cg::renderer::ray to_light(position, light.position - position);
+			cg::renderer::payload shadow = shadow_raytracer->trace_ray(to_light, 1, length(light.position - position));
+			if (shadow.t > 0) continue;
 			payload.color += light.color * triangle.diffuse * std::max(0.f, dot(normal, to_light.direction));
 		}
 		
 		return payload;
 	};
+	
+	shadow_raytracer->miss_shader = [](const ray& ray) { 
+		payload payload{};
+		payload.t = -1;
+		return payload;
+	};
+	shadow_raytracer->any_hit_shader = [&](const ray& ray, payload& payload, const triangle<cg::vertex>& triangle) {
+		return payload; 
+	};
 
 	raytracer->build_acceleration_structure();
+	shadow_raytracer->build_acceleration_structure();
 	raytracer->clear_render_target({0, 0, 0});
 
 	PRINT_EXECUTION_TIME("Ray tracing time:",
