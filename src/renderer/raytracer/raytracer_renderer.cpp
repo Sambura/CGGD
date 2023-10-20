@@ -24,6 +24,8 @@ void cg::renderer::ray_tracing_renderer::init() {
 	raytracer->set_render_target(render_target);
 
 	model = std::make_shared<cg::world::model>(settings->model_path);
+	raytracer->set_vertex_buffers(model->get_vertex_buffers());
+	raytracer->set_index_buffers(model->get_index_buffers());
 
 	camera = std::make_shared<cg::world::camera>();
 	camera->set_height(static_cast<float>(settings->height));
@@ -41,15 +43,23 @@ void cg::renderer::ray_tracing_renderer::destroy() {}
 void cg::renderer::ray_tracing_renderer::update() {}
 
 void cg::renderer::ray_tracing_renderer::render() {
-	// TODO Lab: 2.02 Add `closest_hit_shader` to `raytracer` class to return diffuse color
 	// TODO Lab: 2.03 Adjust `closest_hit_shader` of `raytracer` to implement Lambertian shading model
 	// TODO Lab: 2.04 Define `any_hit_shader` and `miss_shader` for `shadow_raytracer`
 	// TODO Lab: 2.04 Adjust `closest_hit_shader` of `raytracer` to cast shadows rays and to ignore occluded lights
 	// TODO Lab: 2.05 Adjust `ray_tracing_renderer` class to build the acceleration structure
 	// TODO Lab: 2.06 (Bonus) Adjust `closest_hit_shader` for Monte-Carlo light tracing
 
-	raytracer->miss_shader = [](const ray& ray) { payload payload{}; payload.color = cg::fcolor{0.f, 0.f, ray.direction.y / 2 + 0.5f}; return payload; };
+	raytracer->miss_shader = [](const ray& ray) { 
+		payload payload{}; 
+		payload.color = cg::fcolor{0.f, 0.f, ray.direction.y / 2 + 0.5f}; 
+		return payload; 
+	};
+	raytracer->closest_hit_shader = [](const ray& ray, payload& payload, const triangle<cg::vertex>& triangle, size_t depth) {
+		payload.color = triangle.diffuse;
+		return payload;
+	};
 
+	raytracer->build_acceleration_structure();
 	raytracer->clear_render_target({0, 0, 0});
 
 	PRINT_EXECUTION_TIME("Ray tracing time:",

@@ -51,11 +51,11 @@ namespace cg::renderer
 	};
 
 	template<typename VB>
-	inline triangle<VB>::triangle(
-			const VB& vertex_a, const VB& vertex_b, const VB& vertex_c)
-	{
-		// TODO Lab: 2.02 Implement a constructor of `triangle` struct
-	}
+	inline triangle<VB>::triangle(const VB& vertex_a, const VB& vertex_b, const VB& vertex_c) : 
+		a(vertex_a.pos.xyz()), b(vertex_b.pos.xyz()), c(vertex_c.pos.xyz()), 
+		ba(vertex_b.pos.xyz() - vertex_a.pos.xyz()), ca(vertex_c.pos.xyz() - vertex_a.pos.xyz()),
+		na(vertex_a.norm), nb(vertex_b.norm), nc(vertex_c.norm), 
+		ambient(vertex_a.ambient), diffuse(vertex_a.diffuse), emissive(vertex_a.emissive) {}
 
 	template<typename VB>
 	class aabb
@@ -141,22 +141,29 @@ namespace cg::renderer
 	}
 
 	template<typename VB, typename RT>
-	inline void raytracer<VB, RT>::set_vertex_buffers(std::vector<std::shared_ptr<cg::resource<VB>>> in_vertex_buffers)
-	{
-		// TODO Lab: 2.02 Implement `set_vertex_buffers` and `set_index_buffers` of `raytracer` class
+	inline void raytracer<VB, RT>::set_vertex_buffers(std::vector<std::shared_ptr<cg::resource<VB>>> in_vertex_buffers) {
+		vertex_buffers = in_vertex_buffers;
 	}
 
 	template<typename VB, typename RT>
-	void raytracer<VB, RT>::set_index_buffers(std::vector<std::shared_ptr<cg::resource<unsigned int>>> in_index_buffers)
-	{
-		// TODO Lab: 2.02 Implement `set_vertex_buffers` and `set_index_buffers` of `raytracer` class
+	void raytracer<VB, RT>::set_index_buffers(std::vector<std::shared_ptr<cg::resource<unsigned int>>> in_index_buffers) {
+		index_buffers = in_index_buffers;
 	}
 
 	template<typename VB, typename RT>
 	inline void raytracer<VB, RT>::build_acceleration_structure()
 	{
-		// TODO Lab: 2.02 Fill `triangles` vector in `build_acceleration_structure` of `raytracer` class
 		// TODO Lab: 2.05 Implement `build_acceleration_structure` method of `raytracer` class
+
+		for (size_t i = 0; i < index_buffers.size(); i++) {
+			for (size_t vi = 0; vi < index_buffers[i]->get_number_of_elements();) {
+				triangles.push_back({
+					vertex_buffers[i]->item(index_buffers[i]->item(vi++)), 
+					vertex_buffers[i]->item(index_buffers[i]->item(vi++)), 
+					vertex_buffers[i]->item(index_buffers[i]->item(vi++))
+				});
+			}
+		}
 	}
 
 	template<typename VB, typename RT>
@@ -185,21 +192,52 @@ namespace cg::renderer
 	inline payload raytracer<VB, RT>::trace_ray(
 			const ray& ray, size_t depth, float max_t, float min_t) const
 	{
-		// TODO Lab: 2.02 Adjust `trace_ray` method of `raytracer` class to traverse geometry and call a closest hit shader
 		// TODO Lab: 2.04 Adjust `trace_ray` method of `raytracer` to use `any_hit_shader`
 		// TODO Lab: 2.05 Adjust `trace_ray` method of `raytracer` class to traverse the acceleration structure
 
 		if (depth-- == 0) return miss_shader(ray);
 
+		payload closest_intersection {};
+		const triangle<VB>* closest_triangle = nullptr;
+		closest_intersection.t = max_t;
+		for (auto& triangle : triangles) {
+			payload payload = intersection_shader(triangle, ray);
+
+			if (payload.t >= min_t && closest_intersection.t > payload.t) {
+				closest_intersection = payload;
+				closest_triangle = &triangle;
+			}
+		}
+
+		if (closest_triangle && closest_hit_shader)
+			return closest_hit_shader(ray, closest_intersection, *closest_triangle, depth);
+
 		return miss_shader(ray);
 	}
 
 	template<typename VB, typename RT>
-	inline payload raytracer<VB, RT>::intersection_shader(
-			const triangle<VB>& triangle, const ray& ray) const
-	{
-		// TODO Lab: 2.02 Implement an `intersection_shader` method of `raytracer` class
-		return payload{};
+	inline payload raytracer<VB, RT>::intersection_shader(const triangle<VB>& triangle, const ray& ray) const {
+		payload payload {};
+		payload.t = -1;
+		constexpr float tolerance = 1e-8f;
+
+		float3 pvec = cross(ray.direction, triangle.ca);
+		float determinant = dot(pvec, triangle.ba);
+		if (determinant > -tolerance && determinant < tolerance) return payload;
+		float inv_det = 1 / determinant;
+		
+		float3 tvec = ray.position - triangle.a;
+		float u = dot(tvec, pvec) * inv_det;
+		if (u < 0 || u > 1) return payload;
+		float3 qvec = cross(tvec, triangle.ba);
+		float v = dot(ray.direction, qvec) * inv_det;
+		if (v < 0 || v + u > 1) return payload;
+		float w = 1 - v - u;
+
+		payload.t = dot(triangle.ca, qvec) * inv_det;
+		payload.bary = float3{ w, u, v }; // ????
+
+		return payload;
 	}
 
 	template<typename VB, typename RT>
