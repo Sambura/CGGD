@@ -15,7 +15,6 @@ std::chrono::steady_clock::time_point __pet_start_time;
 		).count() << " ms.\n";
 
 void cg::renderer::ray_tracing_renderer::init() {
-	// TODO Lab: 2.03 Add light information to `lights` array of `ray_tracing_renderer`
 	// TODO Lab: 2.04 Initialize `shadow_raytracer` in `ray_tracing_renderer`
 
 	raytracer = std::make_shared<cg::renderer::raytracer<cg::vertex, cg::ucolor>>();
@@ -26,6 +25,11 @@ void cg::renderer::ray_tracing_renderer::init() {
 	model = std::make_shared<cg::world::model>(settings->model_path);
 	raytracer->set_vertex_buffers(model->get_vertex_buffers());
 	raytracer->set_index_buffers(model->get_index_buffers());
+
+	lights.push_back({
+		float3{0, 1.58f, -0.03f},
+		float3{0.78f}
+	});
 
 	camera = std::make_shared<cg::world::camera>();
 	camera->set_height(static_cast<float>(settings->height));
@@ -48,14 +52,24 @@ void cg::renderer::ray_tracing_renderer::render() {
 	// TODO Lab: 2.04 Adjust `closest_hit_shader` of `raytracer` to cast shadows rays and to ignore occluded lights
 	// TODO Lab: 2.05 Adjust `ray_tracing_renderer` class to build the acceleration structure
 	// TODO Lab: 2.06 (Bonus) Adjust `closest_hit_shader` for Monte-Carlo light tracing
+	
+	// TODO: Take angle of view into account
 
 	raytracer->miss_shader = [](const ray& ray) { 
 		payload payload{}; 
 		payload.color = cg::fcolor{0.f, 0.f, ray.direction.y / 2 + 0.5f}; 
 		return payload; 
 	};
-	raytracer->closest_hit_shader = [](const ray& ray, payload& payload, const triangle<cg::vertex>& triangle, size_t depth) {
-		payload.color = triangle.diffuse;
+	raytracer->closest_hit_shader = [&](const ray& ray, payload& payload, const triangle<cg::vertex>& triangle, size_t depth) {
+		payload.color = triangle.emissive;
+		float3 position = ray.position + ray.direction * payload.t;
+		float3 normal = payload.bary.x * triangle.na + payload.bary.y * triangle.nb + payload.bary.z * triangle.nc;
+		
+		for (auto& light : lights) {
+			cg::renderer::ray to_light(position, light.position - position);
+			payload.color += light.color * triangle.diffuse * std::max(0.f, dot(normal, to_light.direction));
+		}
+		
 		return payload;
 	};
 
