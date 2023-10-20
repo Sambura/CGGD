@@ -25,12 +25,10 @@ void cg::renderer::ray_tracing_renderer::init() {
 	raytracer->set_index_buffers(model->get_index_buffers());
 
 	shadow_raytracer = std::make_shared<cg::renderer::raytracer<cg::vertex, cg::ucolor>>();
-	shadow_raytracer->set_vertex_buffers(model->get_vertex_buffers());
-	shadow_raytracer->set_index_buffers(model->get_index_buffers());
 
 	lights.push_back({
-		float3{0, 1.58f, -0.03f},
-		float3{0.78f}
+		float3{0, 1.58f, -0.03f}, // position
+		float3{0.78f} // color
 	});
 
 	camera = std::make_shared<cg::world::camera>();
@@ -55,7 +53,6 @@ cg::renderer::payload skybox_shader(const cg::renderer::ray& ray) {
 }
 
 void cg::renderer::ray_tracing_renderer::render() {
-	// TODO Lab: 2.05 Adjust `ray_tracing_renderer` class to build the acceleration structure
 	// TODO Lab: 2.06 (Bonus) Adjust `closest_hit_shader` for Monte-Carlo light tracing
 	
 	// TODO: Take angle of view into account
@@ -86,10 +83,10 @@ void cg::renderer::ray_tracing_renderer::render() {
 	};
 
 	raytracer->build_acceleration_structure();
-	shadow_raytracer->build_acceleration_structure();
+	shadow_raytracer->acceleration_structures = raytracer->acceleration_structures;
 	raytracer->clear_render_target({0, 0, 0});
 
-	PRINT_EXECUTION_TIME("Ray tracing time:",
+	PRINT_EXECUTION_TIME("Ray tracing time",
 		raytracer->ray_generation(
 				camera->get_position(), 
 				camera->get_forward(), 
