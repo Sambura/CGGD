@@ -125,18 +125,16 @@ namespace cg::renderer
 
 	template<typename VB, typename RT>
 	inline void raytracer<VB, RT>::set_viewport(size_t in_width, size_t in_height) {
-		// TODO Lab: 2.06 Add `history` resource in `raytracer` class
-
 		width = in_width;
 		height = in_height;
+		history = std::make_shared<cg::resource<float3>>(width, height);
 	}
 
 	template<typename VB, typename RT>
 	inline void raytracer<VB, RT>::clear_render_target(const RT& in_clear_value) {
-		// TODO Lab: 2.06 Add `history` resource in `raytracer` class
-
 		for (size_t i = 0; i < render_target->get_number_of_elements(); i++) {
 			render_target->item(i) = in_clear_value;
+			history->item(i) = float3{ 0.f };
 		}
 	}
 
@@ -171,20 +169,29 @@ namespace cg::renderer
 			float3 position, float3 direction,
 			float3 right, float3 up, size_t depth, size_t accumulation_num)
 	{
-		// TODO Lab: 2.06 Implement TAA in `ray_generation` method of `raytracer` class
+		for (size_t frame_id = 0; frame_id < accumulation_num; frame_id++) {
+			std::cout << "Tracing " << frame_id + 1 << "/" << accumulation_num << " frame\n";
+			float2 jitter = get_jitter(frame_id);
 
-#pragma omp parallel for
-		for (int x = 0; x < static_cast<int>(width); x++) {
-			for (int y = 0; y < static_cast<int>(height); y++) {
-				float u = (2.f * x) / static_cast<float>(width) - 1;
-				float v = (2.f * y) / static_cast<float>(height) - 1;
-				u *= static_cast<float>(width) / static_cast<float>(height);
+			#pragma omp parallel for
+			for (int x = 0; x < static_cast<int>(width); x++) {
+				for (int y = 0; y < static_cast<int>(height); y++) {
+					float u = (2.f * x + jitter.x) / static_cast<float>(width) - 1;
+					float v = (2.f * y + jitter.y) / static_cast<float>(height) - 1;
+					u *= static_cast<float>(width) / static_cast<float>(height);
 
-				float3 primary_direction = direction + right * u - up * v;
-				ray primary_ray(position, primary_direction);
-				payload payload = trace_ray(primary_ray, depth);
-				render_target->item(x, y) = cg::from_fcolor(payload.color);
+					float3 primary_direction = direction + right * u - up * v;
+					ray primary_ray(position, primary_direction);
+					payload payload = trace_ray(primary_ray, depth);
+
+					history->item(x, y) += payload.color / accumulation_num;
+				}
 			}
+		}
+
+		#pragma omp parallel for
+		for (int i = 0; i < static_cast<int>(history->get_number_of_elements()); i++) {
+			render_target->item(i) = cg::from_fcolor(history->item(i));
 		}
 	}
 
@@ -244,9 +251,29 @@ namespace cg::renderer
 	}
 
 	template<typename VB, typename RT>
-	float2 raytracer<VB, RT>::get_jitter(int frame_id)
-	{
-		// TODO Lab: 2.06 Implement `get_jitter` method of `raytracer` class
+	float2 raytracer<VB, RT>::get_jitter(int frame_id) {
+		float2 result{ -0.5f };
+		
+		constexpr int base_x = 2;
+		constexpr int base_y = 3;
+
+		float inv_base = 1.f / base_x;
+		float fraction = inv_base;
+
+		for(int index = frame_id + 1; index > 0; index /= base_x) {
+			result.x += (index % base_x) * fraction;
+			fraction *= inv_base;
+		}
+
+		inv_base = 1.f / base_y;
+		fraction = inv_base;
+
+		for(int index = frame_id + 1; index > 0; index /= base_y) {
+			result.y += (index % base_y) * fraction;
+			fraction *= inv_base;
+		}
+
+		return result;
 	}
 
 
