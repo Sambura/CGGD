@@ -184,7 +184,7 @@ namespace cg::renderer
 					ray primary_ray(position, primary_direction);
 					payload payload = trace_ray(primary_ray, depth);
 
-					history->item(x, y) += payload.color / accumulation_num;
+					history->item(x, y) += sqrt(payload.color / accumulation_num);
 				}
 			}
 		}
