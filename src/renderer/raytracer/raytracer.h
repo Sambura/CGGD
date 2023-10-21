@@ -94,7 +94,7 @@ namespace cg::renderer
 		void build_acceleration_structure();
 		std::vector<aabb<VB>> acceleration_structures;
 
-		void ray_generation(float3 position, float3 direction, float3 right, float3 up, size_t depth, size_t accumulation_num);
+		void ray_generation(float3 position, float3 direction, float3 right, float3 up, float fov, size_t depth, size_t accumulation_num);
 
 		payload trace_ray(const ray& ray, size_t depth, float max_t = 1000.f, float min_t = 0.001f) const;
 		payload intersection_shader(const triangle<VB>& triangle, const ray& ray) const;
@@ -102,8 +102,6 @@ namespace cg::renderer
 		std::function<payload(const ray& ray)> miss_shader = nullptr;
 		std::function<payload(const ray& ray, payload& payload, const triangle<VB>& triangle, size_t depth)>
 				closest_hit_shader = nullptr;
-		std::function<payload(const ray& ray, payload& payload, const triangle<VB>& triangle)> any_hit_shader =
-				nullptr;
 
 		float2 get_jitter(int frame_id);
 
@@ -167,8 +165,12 @@ namespace cg::renderer
 	template<typename VB, typename RT>
 	inline void raytracer<VB, RT>::ray_generation(
 			float3 position, float3 direction,
-			float3 right, float3 up, size_t depth, size_t accumulation_num)
+			float3 right, float3 up, float fov, size_t depth, size_t accumulation_num)
 	{
+		float max_v = 2 * tan(fov / 2);
+		float max_u = max_v * static_cast<float>(width) / static_cast<float>(height);
+		float iter_factor = 1.0f / accumulation_num;
+
 		for (size_t frame_id = 0; frame_id < accumulation_num; frame_id++) {
 			std::cout << "Tracing " << frame_id + 1 << "/" << accumulation_num << " frame\n";
 			float2 jitter = get_jitter(frame_id);
@@ -176,15 +178,14 @@ namespace cg::renderer
 			#pragma omp parallel for
 			for (int x = 0; x < static_cast<int>(width); x++) {
 				for (int y = 0; y < static_cast<int>(height); y++) {
-					float u = (2.f * x + jitter.x) / static_cast<float>(width) - 1;
-					float v = (2.f * y + jitter.y) / static_cast<float>(height) - 1;
-					u *= static_cast<float>(width) / static_cast<float>(height);
+					float u = max_u * ((x + jitter.x) / static_cast<float>(width) - 0.5f);
+					float v = max_v * ((y + jitter.y) / static_cast<float>(height) - 0.5f);
 
 					float3 primary_direction = direction + right * u - up * v;
 					ray primary_ray(position, primary_direction);
 					payload payload = trace_ray(primary_ray, depth);
 
-					history->item(x, y) += sqrt(payload.color / accumulation_num);
+					history->item(x, y) += sqrt(payload.color * iter_factor);
 				}
 			}
 		}
@@ -214,7 +215,6 @@ namespace cg::renderer
 				if (payload.t >= min_t && closest_intersection.t > payload.t) {
 					closest_intersection = payload;
 					closest_triangle = &triangle;
-					if (any_hit_shader) return any_hit_shader(ray, payload, triangle);
 				}
 			}
 		}
@@ -254,8 +254,7 @@ namespace cg::renderer
 	float2 raytracer<VB, RT>::get_jitter(int frame_id) {
 		float2 result{ -0.5f };
 		
-		constexpr int base_x = 2;
-		constexpr int base_y = 3;
+		constexpr int base_x = 2, base_y = 3;
 
 		float inv_base = 1.f / base_x;
 		float fraction = inv_base;

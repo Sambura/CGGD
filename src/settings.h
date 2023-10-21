@@ -25,6 +25,7 @@ namespace cg
 		float camera_z_far;
 		bool disable_depth;
 		bool show_render;
+		bool raytracing_use_fov;
 
 		std::filesystem::path result_path;
 		std::filesystem::path depth_result_path;

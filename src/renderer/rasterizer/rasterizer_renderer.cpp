@@ -4,16 +4,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-std::chrono::steady_clock::time_point __pet_start_time;
-
-#define PRINT_EXECUTION_TIME(name, stmts) \
-	__pet_start_time = std::chrono::high_resolution_clock::now(); \
-	stmts \
-	std::cout << name << ": " << \
-		(static_cast<std::chrono::duration<float, std::milli>>( \
-			std::chrono::high_resolution_clock::now() - __pet_start_time) \
-		).count() << " ms.\n";
-
 void cg::renderer::rasterization_renderer::init() {
 	rasterizer = std::make_shared<cg::renderer::rasterizer<cg::vertex, cg::ucolor>>();
 	rasterizer->set_viewport(settings->width, settings->height);

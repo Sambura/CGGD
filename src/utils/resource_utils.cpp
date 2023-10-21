@@ -8,6 +8,7 @@
 #include <stb_image_write.h>
 #include <fstream>
 
+std::chrono::steady_clock::time_point __pet_start_time;
 
 using namespace cg::utils;
 

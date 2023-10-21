@@ -3,16 +3,10 @@
 #include "utils/resource_utils.h"
 
 #include <iostream>
+#define _USE_MATH_DEFINES
+#include <math.h>
 
-std::chrono::steady_clock::time_point __pet_start_time;
-
-#define PRINT_EXECUTION_TIME(name, stmts) \
-	__pet_start_time = std::chrono::high_resolution_clock::now(); \
-	stmts \
-	std::cout << name << ": " << \
-		(static_cast<std::chrono::duration<float, std::milli>>( \
-			std::chrono::high_resolution_clock::now() - __pet_start_time) \
-		).count() << " ms.\n";
+constexpr float default_fov = (float)M_PI_2;
 
 void cg::renderer::ray_tracing_renderer::init() {
 	model = std::make_shared<cg::world::model>(settings->model_path);
@@ -31,21 +25,11 @@ void cg::renderer::ray_tracing_renderer::init() {
 	camera->set_theta(settings->camera_theta);
 	camera->set_phi(settings->camera_phi);
 	camera->set_field_of_view(settings->camera_angle_of_view);
-	camera->set_z_near(settings->camera_z_near);
-	camera->set_z_far(settings->camera_z_far);
 }
 
 void cg::renderer::ray_tracing_renderer::destroy() {}
 
 void cg::renderer::ray_tracing_renderer::update() {}
-
-typedef std::function<cg::renderer::payload(const cg::renderer::ray& ray, cg::renderer::payload& payload, const cg::renderer::triangle<cg::vertex>& triangle, size_t depth)> ClosestHitShader;
-
-cg::renderer::payload skybox_shader(const cg::renderer::ray& ray) {
-	cg::renderer::payload payload{}; 
-	payload.color = cg::fcolor{0.f, 0.f, ray.direction.y / 2 + 0.5f}; 
-	return payload; 
-}
 
 cg::renderer::payload black_shader(const cg::renderer::ray& ray) {
 	cg::renderer::payload payload{}; 
@@ -54,8 +38,6 @@ cg::renderer::payload black_shader(const cg::renderer::ray& ray) {
 }
 
 void cg::renderer::ray_tracing_renderer::render() {
-	// TODO: Take angle of view into account
-
 	raytracer->miss_shader = black_shader;
 	std::random_device random_device;
 	std::mt19937 random_generator(random_device());
@@ -83,6 +65,7 @@ void cg::renderer::ray_tracing_renderer::render() {
 				camera->get_forward(), 
 				camera->get_right(), 
 				camera->get_up(), 
+				settings->raytracing_use_fov ? camera->get_fov() : default_fov,
 				settings->raytracing_depth, 
 				settings->accumulation_num
 		);

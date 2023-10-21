@@ -4,6 +4,15 @@
 
 #include <filesystem>
 
+extern std::chrono::steady_clock::time_point __pet_start_time;
+
+#define PRINT_EXECUTION_TIME(name, stmts) \
+	__pet_start_time = std::chrono::high_resolution_clock::now(); \
+	stmts \
+	std::cout << name << ": " << \
+		(static_cast<std::chrono::duration<float, std::milli>>( \
+			std::chrono::high_resolution_clock::now() - __pet_start_time) \
+		).count() << " ms.\n";
 
 namespace cg::utils
 {
