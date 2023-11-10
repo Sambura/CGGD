@@ -10,10 +10,7 @@ namespace cg::utils
 	{
 	public:
 		static int run(cg::renderer::renderer* renderer, HINSTANCE hinstance, int ncmdshow);
-		static HWND get_hwnd()
-		{
-			return hwnd;
-		}
+		static HWND get_hwnd() { return hwnd; }
 
 		static bool pressed_w;
 		static bool pressed_s;
@@ -26,4 +23,4 @@ namespace cg::utils
 	private:
 		static HWND hwnd;
 	};
-}// namespace cg::utils
+} // namespace cg::utils

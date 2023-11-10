@@ -6,10 +6,14 @@ using namespace cg::utils;
 
 HWND window::hwnd = nullptr;
 
-bool window::pressed_a = false;
-bool window::pressed_d = false;
 bool window::pressed_w = false;
+bool window::pressed_a = false;
 bool window::pressed_s = false;
+bool window::pressed_d = false;
+constexpr unsigned char KEY_W = 87;
+constexpr unsigned char KEY_A = 65;
+constexpr unsigned char KEY_S = 83;
+constexpr unsigned char KEY_D = 68;
 
 int cg::utils::window::run(cg::renderer::renderer* renderer, HINSTANCE hinstance, int ncmdshow)
 {
@@ -89,17 +93,17 @@ LRESULT cg::utils::window::window_proc(HWND hwnd, UINT message, WPARAM wparam, L
 			{
 				switch (static_cast<UINT8>(wparam))
 				{
-					case 87:// w
+					case KEY_W:
 						window::pressed_w = true;
 						break;
-					case 83:// s
+					case KEY_A:
+						window::pressed_a = true;
+						break;
+					case KEY_S:
 						window::pressed_s = true;
 						break;
-					case 68:// d
+					case KEY_D:
 						window::pressed_d = true;
-						break;
-					case 65:// a
-						window::pressed_a = true;
 						break;
 				}
 			}
@@ -110,17 +114,17 @@ LRESULT cg::utils::window::window_proc(HWND hwnd, UINT message, WPARAM wparam, L
 				{
 					switch (static_cast<UINT8>(wparam))
 					{
-						case 87:// w
+						case KEY_W:
 							window::pressed_w = false;
 							break;
-						case 83:// s
+						case KEY_A:
+							window::pressed_a = false;
+							break;
+						case KEY_S:
 							window::pressed_s = false;
 							break;
-						case 68:// d
+						case KEY_D:
 							window::pressed_d = false;
-							break;
-						case 65:// a
-							window::pressed_a = false;
 							break;
 					}
 				}
