@@ -54,22 +54,21 @@ const float4x4 cg::world::camera::get_view_matrix() const {
 }
 
 #ifdef DX12
-const DirectX::XMMATRIX cg::world::camera::get_dxm_view_matrix() const
-{
-	// TODO Lab: 3.08 Implement `get_dxm_view_matrix`, `get_dxm_projection_matrix`, and `get_dxm_mvp_matrix` methods of `camera`
-	return  DirectX::XMMatrixIdentity();
+const DirectX::XMMATRIX cg::world::camera::get_dxm_view_matrix() const {
+	float3 forward = get_forward();
+	float3 up = get_up();
+	DirectX::FXMVECTOR eye_position{position.x, position.y, position.z};
+	DirectX::FXMVECTOR eye_direction{forward.x, forward.y, forward.z};
+	DirectX::FXMVECTOR up_direction{up.x, up.y, up.z};
+	return DirectX::XMMatrixLookToRH(eye_position, eye_direction, up_direction);
 }
 
-const DirectX::XMMATRIX cg::world::camera::get_dxm_projection_matrix() const
-{
-	// TODO Lab: 3.08 Implement `get_dxm_view_matrix`, `get_dxm_projection_matrix`, and `get_dxm_mvp_matrix` methods of `camera`
-	return  DirectX::XMMatrixIdentity();
+const DirectX::XMMATRIX cg::world::camera::get_dxm_projection_matrix() const {
+	return DirectX::XMMatrixPerspectiveFovRH(field_of_view, aspect_ratio, z_near, z_far);
 }
 
-const DirectX::XMMATRIX camera::get_dxm_mvp_matrix() const
-{
-	// TODO Lab: 3.08 Implement `get_dxm_view_matrix`, `get_dxm_projection_matrix`, and `get_dxm_mvp_matrix` methods of `camera`
-	return  DirectX::XMMatrixIdentity();
+const DirectX::XMMATRIX camera::get_dxm_mvp_matrix() const {
+	return get_dxm_view_matrix() * get_dxm_projection_matrix();
 }
 #endif
 
