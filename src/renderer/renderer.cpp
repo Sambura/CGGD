@@ -54,32 +54,40 @@ std::shared_ptr<renderer> cg::renderer::make_renderer(std::shared_ptr<cg::settin
 	THROW_ERROR("Type of renderer is not selected");
 }
 
-void cg::renderer::renderer::move_forward(float delta)
-{
+void cg::renderer::renderer::move_forward(float delta) {
 	camera->set_position(
 			camera->get_position() +
 			camera->get_forward() * delta * frame_duration);
 }
 
-void cg::renderer::renderer::move_backward(float delta)
-{
+void cg::renderer::renderer::move_backward(float delta) {
 	camera->set_position(
 			camera->get_position() -
 			camera->get_forward() * delta * frame_duration);
 }
 
-void cg::renderer::renderer::move_left(float delta)
-{
+void cg::renderer::renderer::move_left(float delta) {
 	camera->set_position(
 			camera->get_position()
 			- camera->get_right() * delta * frame_duration);
 }
 
-void cg::renderer::renderer::move_right(float delta)
-{
+void cg::renderer::renderer::move_right(float delta) {
 	camera->set_position(
 			camera->get_position() +
 			camera->get_right() * delta * frame_duration);
+}
+
+void cg::renderer::renderer::move_up(float delta) {
+	camera->set_position(
+			camera->get_position() +
+			float3{0, 1, 0} * delta * frame_duration);
+}
+
+void cg::renderer::renderer::move_down(float delta) {
+	camera->set_position(
+			camera->get_position() +
+			float3{0, -1, 0} * delta * frame_duration);
 }
 
 void cg::renderer::renderer::move_yaw(float delta)

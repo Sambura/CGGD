@@ -16,6 +16,8 @@ namespace cg::utils
 		static bool pressed_s;
 		static bool pressed_a;
 		static bool pressed_d;
+		static bool pressed_space;
+		static bool pressed_ctrl;
 
 	protected:
 		static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);

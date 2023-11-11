@@ -10,10 +10,15 @@ bool window::pressed_w = false;
 bool window::pressed_a = false;
 bool window::pressed_s = false;
 bool window::pressed_d = false;
+bool window::pressed_space = false;
+bool window::pressed_ctrl = false;
+
 constexpr unsigned char KEY_W = 87;
 constexpr unsigned char KEY_A = 65;
 constexpr unsigned char KEY_S = 83;
 constexpr unsigned char KEY_D = 68;
+constexpr unsigned char KEY_SPACE = 0x20;
+constexpr unsigned char KEY_CTRL = 0x11;
 
 int cg::utils::window::run(cg::renderer::renderer* renderer, HINSTANCE hinstance, int ncmdshow)
 {
@@ -68,12 +73,11 @@ LRESULT cg::utils::window::window_proc(HWND hwnd, UINT message, WPARAM wparam, L
 			SetWindowLongPtr(
 					hwnd, GWLP_USERDATA,
 					reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
-		}
 			return 0;
+		}
 
-		case WM_PAINT: {
-			if (renderer)
-			{
+		case WM_PAINT:
+			if (renderer) {
 				if (window::pressed_w)
 					renderer->move_forward(10.f);
 				if (window::pressed_s)
@@ -82,65 +86,70 @@ LRESULT cg::utils::window::window_proc(HWND hwnd, UINT message, WPARAM wparam, L
 					renderer->move_left(10.f);
 				if (window::pressed_d)
 					renderer->move_right(10.f);
+				if (window::pressed_ctrl)
+					renderer->move_down(10.f);
+				if (window::pressed_space)
+					renderer->move_up(10.f);
+				
 				renderer->update();
 				renderer->render();
 			}
-		}
 			return 0;
 
-		case WM_KEYDOWN: {
-			if (renderer)
-			{
-				switch (static_cast<UINT8>(wparam))
-				{
-					case KEY_W:
-						window::pressed_w = true;
-						break;
-					case KEY_A:
-						window::pressed_a = true;
-						break;
-					case KEY_S:
-						window::pressed_s = true;
-						break;
-					case KEY_D:
-						window::pressed_d = true;
-						break;
-				}
+		case WM_KEYDOWN:
+			switch (static_cast<UINT8>(wparam)) {
+				case KEY_W:
+					window::pressed_w = true;
+					break;
+				case KEY_A:
+					window::pressed_a = true;
+					break;
+				case KEY_S:
+					window::pressed_s = true;
+					break;
+				case KEY_D:
+					window::pressed_d = true;
+					break;
+				case KEY_SPACE:
+					window::pressed_space = true;
+					break;
+				case KEY_CTRL:
+					window::pressed_ctrl = true;
+					break;
 			}
 			return 0;
-		}
-			case WM_KEYUP: {
-				if (renderer)
-				{
-					switch (static_cast<UINT8>(wparam))
-					{
-						case KEY_W:
-							window::pressed_w = false;
-							break;
-						case KEY_A:
-							window::pressed_a = false;
-							break;
-						case KEY_S:
-							window::pressed_s = false;
-							break;
-						case KEY_D:
-							window::pressed_d = false;
-							break;
-					}
-				}
-		}
+
+		case WM_KEYUP: 
+			switch (static_cast<UINT8>(wparam)) {
+				case KEY_W:
+					window::pressed_w = false;
+					break;
+				case KEY_A:
+					window::pressed_a = false;
+					break;
+				case KEY_S:
+					window::pressed_s = false;
+					break;
+				case KEY_D:
+					window::pressed_d = false;
+					break;
+				case KEY_SPACE:
+					window::pressed_space = false;
+					break;
+				case KEY_CTRL:
+					window::pressed_ctrl = false;
+					break;
+			}
 			return 0;
 
-		case WM_MOUSEMOVE: {
-			if (renderer)
-			{
+		case WM_MOUSEMOVE:
+			if (renderer) {
 				short x_pos = GET_X_LPARAM(lparam);
 				short y_pos = GET_Y_LPARAM(lparam);
 
 				renderer->move_yaw((2.f * static_cast<float>(x_pos) / renderer->get_width() - 1.f) * 120.f);
 				renderer->move_pitch((-2.f * static_cast<float>(y_pos) / renderer->get_height() + 1.f) * 120.f);
 			}
-		}
 			return 0;
 
 		case WM_DESTROY:
