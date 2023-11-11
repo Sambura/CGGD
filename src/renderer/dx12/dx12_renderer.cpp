@@ -305,8 +305,6 @@ void cg::renderer::dx12_renderer::create_constant_buffer_view(const ComPtr<ID3D1
 
 void cg::renderer::dx12_renderer::load_assets()
 {
-	// TODO Lab: 3.07 Create a fence and fence event
-
 	create_root_signature(nullptr, 0);
 	create_pso("shaders.hlsl");
 	create_command_allocators();
@@ -350,6 +348,13 @@ void cg::renderer::dx12_renderer::load_assets()
 	CD3DX12_RANGE read_range(0, 0);
 	THROW_IF_FAILED(constant_buffer->Map(0, &read_range, reinterpret_cast<void**>(&constant_buffer_data_begin)));
 	create_constant_buffer_view(constant_buffer, cbv_srv_heap.get_cpu_descriptor_handle());
+
+	THROW_IF_FAILED(command_list->Close());
+	THROW_IF_FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
+	fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (fence_event == nullptr) THROW_IF_FAILED(HRESULT_FROM_WIN32(GetLastError()));
+
+	wait_for_gpu();
 }
 
 void cg::renderer::dx12_renderer::populate_command_list() {
@@ -388,11 +393,21 @@ void cg::renderer::dx12_renderer::populate_command_list() {
 }
 
 void cg::renderer::dx12_renderer::move_to_next_frame() {
-	// TODO Lab: 3.07 Implement `move_to_next_frame` method
+	const UINT64 current_fence_value = fence_values[frame_index];
+	THROW_IF_FAILED(command_queue->Signal(fence.Get(), current_fence_value));
+	frame_index = swap_chain->GetCurrentBackBufferIndex();
+	if (fence->GetCompletedValue() < fence_values[frame_index]) {
+		THROW_IF_FAILED(fence->SetEventOnCompletion(fence_values[frame_index], fence_event));
+		WaitForSingleObjectEx(fence_event, INFINITE, FALSE);
+	}
+	fence_values[frame_index] = current_fence_value + 1;
 }
 
 void cg::renderer::dx12_renderer::wait_for_gpu() {
-	// TODO Lab: 3.07 Implement `wait_for_gpu` method
+	THROW_IF_FAILED(command_queue->Signal(fence.Get(), fence_values[frame_index]));
+	THROW_IF_FAILED(fence->SetEventOnCompletion(fence_values[frame_index], fence_event));
+	WaitForSingleObjectEx(fence_event, INFINITE, FALSE);
+	fence_values[frame_index]++;
 }
 
 void cg::renderer::descriptor_heap::create_heap(ComPtr<ID3D12Device>& device, D3D12_DESCRIPTOR_HEAP_TYPE type, UINT number, D3D12_DESCRIPTOR_HEAP_FLAGS flags)
