@@ -25,6 +25,11 @@ void cg::renderer::dx12_renderer::init() {
 	view_port = CD3DX12_VIEWPORT(0.f, 0.f, static_cast<float>(settings->width), static_cast<float>(settings->height));
 	scissor_rect = CD3DX12_RECT(0, 0, static_cast<LONG>(settings->width), static_cast<LONG>(settings->height));
 
+	cb.light = { 
+		float4{camera->get_position() + float3{0, 2, 0}, 1.f},
+		float4{0.7f, 0.7f, 0.9f, 0.0f}
+	};
+
 	load_pipeline();
 	load_assets();
 }
