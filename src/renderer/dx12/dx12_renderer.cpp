@@ -140,7 +140,7 @@ void cg::renderer::dx12_renderer::create_depth_buffer() {
 	D3D12_CLEAR_VALUE depth_clear_value{};
 	depth_clear_value.Format = DXGI_FORMAT_D32_FLOAT;
 	depth_clear_value.DepthStencil.Depth = 1.f;
-	depth_clear_value.DepthStencil.Stencil = 0.f;
+	depth_clear_value.DepthStencil.Stencil = 0;
 	
 	THROW_IF_FAILED(device->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -175,15 +175,30 @@ void cg::renderer::dx12_renderer::load_pipeline() {
 
 D3D12_STATIC_SAMPLER_DESC cg::renderer::dx12_renderer::get_sampler_descriptor() {
 	D3D12_STATIC_SAMPLER_DESC sampler_desc{};
+	sampler_desc.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	sampler_desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	sampler_desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	sampler_desc.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+	sampler_desc.MaxLOD = D3D12_FLOAT32_MAX;
+	sampler_desc.MinLOD = 0;
+	sampler_desc.MipLODBias = 0;
+	sampler_desc.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+	sampler_desc.Filter = D3D12_FILTER_ANISOTROPIC;
+	sampler_desc.MaxAnisotropy = 16;
+	sampler_desc.ShaderRegister = 0;
+	sampler_desc.RegisterSpace = 0;
+	sampler_desc.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	return sampler_desc;
 }
 
 void cg::renderer::dx12_renderer::create_root_signature(const D3D12_STATIC_SAMPLER_DESC* sampler_descriptors, UINT num_sampler_descriptors) {
-	CD3DX12_ROOT_PARAMETER1 root_parameters[1];
-	CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+	CD3DX12_ROOT_PARAMETER1 root_parameters[2];
+	CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
 
 	ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+	ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
 	root_parameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_ALL);
+	root_parameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
 
 	D3D12_FEATURE_DATA_ROOT_SIGNATURE rs_feature_data{};
 	rs_feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
@@ -238,6 +253,7 @@ ComPtr<ID3DBlob> cg::renderer::dx12_renderer::compile_shader(const std::filesyst
 void cg::renderer::dx12_renderer::create_pso(const std::string& shader_name) {
 	ComPtr<ID3DBlob> vshader = compile_shader(get_shader_path(shader_name), "VSMain", "vs_5_0");
 	ComPtr<ID3DBlob> pshader = compile_shader(get_shader_path(shader_name), "PSMain", "ps_5_0");
+	ComPtr<ID3DBlob> pixel_shader_texture = compile_shader(get_shader_path(shader_name), "PSMain_texture", "ps_5_0");
 	
 	D3D12_INPUT_ELEMENT_DESC element_descs[] = {
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, offsetof(vertex, pos), D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
@@ -269,6 +285,9 @@ void cg::renderer::dx12_renderer::create_pso(const std::string& shader_name) {
 	pso_desc.SampleDesc.Count = 1;
 
 	THROW_IF_FAILED(device->CreateGraphicsPipelineState(&pso_desc, IID_PPV_ARGS(&pipeline_state)));
+	pso_desc.PS = CD3DX12_SHADER_BYTECODE(pixel_shader_texture.Get());
+
+	THROW_IF_FAILED(device->CreateGraphicsPipelineState(&pso_desc, IID_PPV_ARGS(&pipeline_state_texture)));
 }
 
 void cg::renderer::dx12_renderer::create_resource_on_upload_heap(ComPtr<ID3D12Resource>& resource, UINT size, const std::wstring& name)
@@ -348,12 +367,16 @@ D3D12_INDEX_BUFFER_VIEW cg::renderer::dx12_renderer::create_index_buffer_view(co
 	return view;
 }
 
-void cg::renderer::dx12_renderer::create_shader_resource_view(const ComPtr<ID3D12Resource>& texture, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handler)
-{
+void cg::renderer::dx12_renderer::create_shader_resource_view(const ComPtr<ID3D12Resource>& texture, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handler) {
+	D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+	srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srv_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	srv_desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srv_desc.Texture2D.MipLevels = 1;
+	device->CreateShaderResourceView(texture.Get(), &srv_desc, cpu_handler);
 }
 
-void cg::renderer::dx12_renderer::create_constant_buffer_view(const ComPtr<ID3D12Resource>& buffer, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handler)
-{
+void cg::renderer::dx12_renderer::create_constant_buffer_view(const ComPtr<ID3D12Resource>& buffer, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handler) {
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc {};
 	cbv_desc.BufferLocation = buffer->GetGPUVirtualAddress();
 	cbv_desc.SizeInBytes = (sizeof(cb) + 255) & ~255;
@@ -362,15 +385,17 @@ void cg::renderer::dx12_renderer::create_constant_buffer_view(const ComPtr<ID3D1
 
 void cg::renderer::dx12_renderer::load_assets()
 {
-	create_root_signature(nullptr, 0);
+	auto sampler_desc = get_sampler_descriptor();
+	create_root_signature(&sampler_desc, 1);
 	create_pso("shaders.hlsl");
 	create_command_allocators();
 	create_command_list();
 
-	cbv_srv_heap.create_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 
 	auto& model_vertex_buffers = model->get_vertex_buffers();
 	auto& model_index_buffers = model->get_index_buffers();
+	
+	cbv_srv_heap.create_heap(device, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1 + model_vertex_buffers.size(), D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
 
 	upload_vertex_buffers.resize(model_vertex_buffers.size());
 	upload_index_buffers.resize(model_index_buffers.size());
@@ -378,6 +403,8 @@ void cg::renderer::dx12_renderer::load_assets()
 	vertex_buffer_views.resize(model_vertex_buffers.size());
 	index_buffers.resize(model_index_buffers.size());
 	index_buffer_views.resize(model_index_buffers.size());
+	upload_textures.resize(model_vertex_buffers.size());
+	textures.resize(model_vertex_buffers.size());
 
 	for (size_t i = 0; i < model_vertex_buffers.size(); i++) {
 		auto vertex_buffer_data = model_vertex_buffers[i];
@@ -405,6 +432,36 @@ void cg::renderer::dx12_renderer::load_assets()
 			index_buffer_data->get_data(), index_buffer_size, index_buffers[i],
 			upload_index_buffers[i], D3D12_RESOURCE_STATE_INDEX_BUFFER);
 		index_buffer_views[i] = create_index_buffer_view(index_buffers[i], index_buffer_size);
+
+		// Textures 
+		if (model->get_per_shape_texture_files()[i].empty()) continue;
+
+		auto full_name = std::filesystem::absolute(model->get_per_shape_texture_files()[i]).string();
+		int tex_width, tex_height, tex_channels;
+		unsigned char* image = stbi_load(full_name.c_str(), &tex_width, &tex_height, &tex_channels, STBI_rgb_alpha);
+
+		if (image == nullptr) throw std::runtime_error("Can't load texture");
+
+		D3D12_RESOURCE_DESC texture_desc;
+		texture_desc.MipLevels = 1;
+		texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		texture_desc.Width = tex_width;
+		texture_desc.Height = tex_height;
+		texture_desc.DepthOrArraySize = 1;
+		texture_desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		texture_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
+		texture_desc.SampleDesc.Count = 1;
+		texture_desc.SampleDesc.Quality = 0;
+
+		create_resource_on_default_heap(textures[i], 0, model->get_per_shape_texture_files()[i].wstring(), &texture_desc);
+		const UINT upload_buffer_size = static_cast<UINT>(GetRequiredIntermediateSize(textures[i].Get(), 0, 1));
+		create_resource_on_upload_heap(upload_textures[i], upload_buffer_size);
+
+		copy_data(image, upload_buffer_size, textures[i], upload_textures[i], 
+			D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, tex_width * STBI_rgb_alpha, 
+			tex_width * tex_height * STBI_rgb_alpha);
+
+		create_shader_resource_view(textures[i], cbv_srv_heap.get_cpu_descriptor_handle(1 + i));
 	}
 
 	std::wstring const_buffer_name(L"Constant buffer");
@@ -446,7 +503,20 @@ void cg::renderer::dx12_renderer::populate_command_list() {
 	command_list->ClearRenderTargetView(rtv_heap.get_cpu_descriptor_handle(frame_index), clear_color, 0, nullptr);
 	command_list->ClearDepthStencilView(dsv_heap.get_cpu_descriptor_handle(), D3D12_CLEAR_FLAG_DEPTH, 1.f, 0, 0, nullptr);
 
+	// solid color objects
 	for (size_t s = 0; s < model->get_vertex_buffers().size(); s++) {
+		if (!model->get_per_shape_texture_files()[s].empty()) continue;
+		command_list->IASetVertexBuffers(0, 1, &vertex_buffer_views[s]);
+		command_list->IASetIndexBuffer(&index_buffer_views[s]);
+		command_list->DrawIndexedInstanced(static_cast<UINT>(model->get_index_buffers()[s]->get_number_of_elements()), 1, 0, 0, 0);
+	}
+
+	// textured objects
+	command_list->SetPipelineState(pipeline_state_texture.Get());
+	for (size_t s = 0; s < model->get_vertex_buffers().size(); s++) {
+		if (model->get_per_shape_texture_files()[s].empty()) continue;
+
+		command_list->SetGraphicsRootDescriptorTable(1, cbv_srv_heap.get_gpu_descriptor_handle(s + 1)); 
 		command_list->IASetVertexBuffers(0, 1, &vertex_buffer_views[s]);
 		command_list->IASetIndexBuffer(&index_buffer_views[s]);
 		command_list->DrawIndexedInstanced(static_cast<UINT>(model->get_index_buffers()[s]->get_number_of_elements()), 1, 0, 0, 0);
