@@ -442,7 +442,7 @@ void cg::renderer::dx12_renderer::load_assets()
 
 		if (image == nullptr) throw std::runtime_error("Can't load texture");
 
-		D3D12_RESOURCE_DESC texture_desc;
+		D3D12_RESOURCE_DESC texture_desc{};
 		texture_desc.MipLevels = 1;
 		texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
 		texture_desc.Width = tex_width;
