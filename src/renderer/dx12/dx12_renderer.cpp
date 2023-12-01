@@ -260,8 +260,23 @@ void cg::renderer::dx12_renderer::create_resource_on_upload_heap(ComPtr<ID3D12Re
 	if (!name.empty()) resource->SetName(name.c_str());
 }
 
-void cg::renderer::dx12_renderer::create_resource_on_default_heap(ComPtr<ID3D12Resource>& resource, UINT size, const std::wstring& name, D3D12_RESOURCE_DESC* resource_descriptor)
+void cg::renderer::dx12_renderer::create_resource_on_default_heap(ComPtr<ID3D12Resource>& resource, UINT size, 
+	const std::wstring& name, D3D12_RESOURCE_DESC* resource_descriptor)
 {
+	if (resource_descriptor == nullptr) {
+		resource_descriptor = &CD3DX12_RESOURCE_DESC::Buffer(size);
+	}
+
+	THROW_IF_FAILED(device->CreateCommittedResource(
+		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+		D3D12_HEAP_FLAG_NONE,
+		resource_descriptor,
+		D3D12_RESOURCE_STATE_COPY_DEST,
+		nullptr,
+		IID_PPV_ARGS(&resource)
+	));
+
+	if (!name.empty()) resource->SetName(name.c_str());
 }
 
 void cg::renderer::dx12_renderer::copy_data(const void* buffer_data, UINT buffer_size, ComPtr<ID3D12Resource>& destination_resource)
@@ -273,8 +288,19 @@ void cg::renderer::dx12_renderer::copy_data(const void* buffer_data, UINT buffer
 	destination_resource->Unmap(0, 0);
 }
 
-void cg::renderer::dx12_renderer::copy_data(const void* buffer_data, const UINT buffer_size, ComPtr<ID3D12Resource>& destination_resource, ComPtr<ID3D12Resource>& intermediate_resource, D3D12_RESOURCE_STATES state_after, int row_pitch, int slice_pitch)
+void cg::renderer::dx12_renderer::copy_data(const void* buffer_data, const UINT buffer_size, ComPtr<ID3D12Resource>& destination_resource, 
+	ComPtr<ID3D12Resource>& intermediate_resource, D3D12_RESOURCE_STATES state_after, int row_pitch, int slice_pitch)
 {
+	D3D12_SUBRESOURCE_DATA data{};
+	data.pData = buffer_data;
+	data.RowPitch = row_pitch ? row_pitch : buffer_size;
+	data.SlicePitch = slice_pitch ? slice_pitch : buffer_size;
+	
+	UpdateSubresources(command_list.Get(), destination_resource.Get(), intermediate_resource.Get(), 0, 0, 1, &data);
+
+	command_list->ResourceBarrier(
+		1, &CD3DX12_RESOURCE_BARRIER::Transition(destination_resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, state_after)
+	);
 }
 
 D3D12_VERTEX_BUFFER_VIEW cg::renderer::dx12_renderer::create_vertex_buffer_view(const ComPtr<ID3D12Resource>& vertex_buffer, const UINT vertex_buffer_size)
@@ -321,6 +347,8 @@ void cg::renderer::dx12_renderer::load_assets()
 	auto& model_vertex_buffers = model->get_vertex_buffers();
 	auto& model_index_buffers = model->get_index_buffers();
 
+	upload_vertex_buffers.resize(model_vertex_buffers.size());
+	upload_index_buffers.resize(model_index_buffers.size());
 	vertex_buffers.resize(model_vertex_buffers.size());
 	vertex_buffer_views.resize(model_vertex_buffers.size());
 	index_buffers.resize(model_index_buffers.size());
@@ -332,8 +360,11 @@ void cg::renderer::dx12_renderer::load_assets()
 		std::wstring vertex_buffer_name(L"Vertex buffer ");
 		vertex_buffer_name += std::to_wstring(i);
 
-		create_resource_on_upload_heap(vertex_buffers[i], vertex_buffer_size, vertex_buffer_name);
-		copy_data(vertex_buffer_data->get_data(), vertex_buffer_size, vertex_buffers[i]);
+		create_resource_on_default_heap(vertex_buffers[i], vertex_buffer_size, vertex_buffer_name);
+		create_resource_on_upload_heap(upload_vertex_buffers[i], vertex_buffer_size);
+		copy_data(
+			vertex_buffer_data->get_data(), vertex_buffer_size, vertex_buffers[i], 
+			upload_vertex_buffers[i], D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
 		vertex_buffer_views[i] = create_vertex_buffer_view(vertex_buffers[i], vertex_buffer_size);
 	}
 
@@ -343,8 +374,11 @@ void cg::renderer::dx12_renderer::load_assets()
 		std::wstring index_buffer_name(L"Index buffer ");
 		index_buffer_name += std::to_wstring(i);
 
-		create_resource_on_upload_heap(index_buffers[i], index_buffer_size, index_buffer_name);
-		copy_data(index_buffer_data->get_data(), index_buffer_size, index_buffers[i]);
+		create_resource_on_default_heap(index_buffers[i], index_buffer_size, index_buffer_name);
+		create_resource_on_upload_heap(upload_index_buffers[i], index_buffer_size);
+		copy_data(
+			index_buffer_data->get_data(), index_buffer_size, index_buffers[i],
+			upload_index_buffers[i], D3D12_RESOURCE_STATE_INDEX_BUFFER);
 		index_buffer_views[i] = create_index_buffer_view(index_buffers[i], index_buffer_size);
 	}
 
@@ -356,6 +390,8 @@ void cg::renderer::dx12_renderer::load_assets()
 	create_constant_buffer_view(constant_buffer, cbv_srv_heap.get_cpu_descriptor_handle());
 
 	THROW_IF_FAILED(command_list->Close());
+	ID3D12CommandList* command_lists[] = {command_list.Get()};
+	command_queue->ExecuteCommandLists(_countof(command_lists), command_lists);
 	THROW_IF_FAILED(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)));
 	fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	if (fence_event == nullptr) THROW_IF_FAILED(HRESULT_FROM_WIN32(GetLastError()));
