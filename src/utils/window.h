@@ -19,6 +19,10 @@ namespace cg::utils
 		static bool pressed_space;
 		static bool pressed_ctrl;
 
+		static int last_x;
+		static int last_y;
+		static bool reset_frame;
+
 	protected:
 		static LRESULT CALLBACK window_proc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 

@@ -12,6 +12,9 @@ bool window::pressed_s = false;
 bool window::pressed_d = false;
 bool window::pressed_space = false;
 bool window::pressed_ctrl = false;
+int window::last_x = -1;
+int window::last_y = -1;
+bool window::reset_frame = true;
 
 constexpr unsigned char KEY_W = 87;
 constexpr unsigned char KEY_A = 65;
@@ -44,6 +47,7 @@ int cg::utils::window::run(cg::renderer::renderer* renderer, HINSTANCE hinstance
 	// Initialize the sample. OnInit is defined in each child-implementation of DXSample.
 	renderer->init();
 	ShowWindow(hwnd, ncmdshow);
+	ShowCursor(false);
 	// Main sample loop.
 	MSG msg = {};
 	while (msg.message != WM_QUIT)
@@ -146,9 +150,21 @@ LRESULT cg::utils::window::window_proc(HWND hwnd, UINT message, WPARAM wparam, L
 			if (renderer) {
 				short x_pos = GET_X_LPARAM(lparam);
 				short y_pos = GET_Y_LPARAM(lparam);
+				float sensitivity = 500;
 
-				renderer->move_yaw((2.f * static_cast<float>(x_pos) / renderer->get_width() - 1.f) * 120.f);
-				renderer->move_pitch((-2.f * static_cast<float>(y_pos) / renderer->get_height() + 1.f) * 120.f);
+				if (last_x >= 0 && !reset_frame) {
+					short x_delta = x_pos - last_x;
+					short y_delta = y_pos - last_y;
+
+					renderer->move_yaw(sensitivity * static_cast<float>(x_delta) / renderer->get_width());
+					renderer->move_pitch(-sensitivity * static_cast<float>(y_delta) / renderer->get_height());
+
+					SetCursorPos(renderer->get_width() / 2, renderer->get_height() / 2);
+				}
+
+				reset_frame = !reset_frame;
+				last_x = x_pos;
+				last_y = y_pos;
 			}
 			return 0;
 
