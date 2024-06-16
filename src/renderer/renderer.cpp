@@ -90,12 +90,14 @@ void cg::renderer::renderer::move_down(float delta) {
 			float3{0, -1, 0} * delta * frame_duration);
 }
 
+constexpr float rad2deg = 180 / 3.141592653589f;
+
 void cg::renderer::renderer::move_yaw(float delta)
 {
-	camera->set_theta(camera->get_theta() + delta);
+	camera->set_theta(camera->get_theta() * rad2deg + delta);
 }
 
 void cg::renderer::renderer::move_pitch(float delta)
 {
-	camera->set_phi(camera->get_phi() + delta);
+	camera->set_phi(camera->get_phi() * rad2deg + delta);
 }
